@@ -13,10 +13,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"video-transcription-service/internal/auth"
 	"video-transcription-service/internal/config"
 	"video-transcription-service/internal/database"
 	"video-transcription-service/internal/health"
 	"video-transcription-service/internal/middleware"
+	"video-transcription-service/internal/users"
 	"video-transcription-service/pkg/logger"
 )
 
@@ -67,7 +69,7 @@ func main() {
 		gin.SetMode(gin.DebugMode)
 	}
 
-	// 5. Setup Router & Middleware
+	// 5. Setup Router & Global Middleware
 	router := gin.New()
 	router.Use(middleware.Recovery())
 	router.Use(middleware.RequestLogger())
@@ -86,15 +88,24 @@ func main() {
 	healthHandler := health.NewHandler(checkers)
 	healthHandler.RegisterRoutes(router)
 
-	// Base API route placeholder for future modules
+	// 7. Initialize Repositories, Services, and Handlers
+	authMiddleware := middleware.Auth(cfg.JWTSecret)
+
 	v1 := router.Group("/api/v1")
 	{
 		v1.GET("/ping", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"message": "pong"})
 		})
+
+		if db != nil {
+			userRepo := users.NewRepository(db.Pool)
+			authService := auth.NewService(userRepo, cfg)
+			authHandler := auth.NewHandler(authService)
+			authHandler.RegisterRoutes(v1, authMiddleware)
+		}
 	}
 
-	// 7. Setup HTTP Server
+	// 8. Setup HTTP Server
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      router,
@@ -103,7 +114,7 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// 8. Start server in a background goroutine
+	// 9. Start server in a background goroutine
 	go func() {
 		slog.Info("HTTP server listening", slog.String("addr", server.Addr))
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -112,7 +123,7 @@ func main() {
 		}
 	}()
 
-	// 9. Wait for interrupt signal for graceful shutdown
+	// 10. Wait for interrupt signal for graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	sig := <-quit
