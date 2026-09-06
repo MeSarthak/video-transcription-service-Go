@@ -1,0 +1,34 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Temporary and build artifacts
+tmp/
+temp/
+coverage.txt
+profile.out
+
+# IDE and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# Node / Frontend (for future Phase 11)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
