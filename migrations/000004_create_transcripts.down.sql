@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS transcript_segments CASCADE;
+DROP TABLE IF EXISTS transcripts CASCADE;

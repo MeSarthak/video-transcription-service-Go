@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"video-transcription-service/internal/config"
+	"video-transcription-service/internal/database"
 	"video-transcription-service/internal/health"
 	"video-transcription-service/internal/middleware"
 	"video-transcription-service/pkg/logger"
@@ -35,21 +36,54 @@ func main() {
 		slog.String("log_level", cfg.LogLevel),
 	)
 
-	// 3. Set Gin mode
+	// 3. Initialize Database & run migrations
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	db, err := database.New(ctx, cfg)
+	if err != nil {
+		if cfg.IsProduction() {
+			slog.Error("Database connection failed in production", slog.Any("error", err))
+			os.Exit(1)
+		} else {
+			slog.Warn("Database connection failed (development mode) - continuing with degraded ready probe", slog.Any("error", err))
+		}
+	} else {
+		defer db.Close()
+
+		// Run automated migrations
+		if err := database.RunMigrations(cfg.DatabaseURL); err != nil {
+			slog.Error("Failed to apply database migrations", slog.Any("error", err))
+			if cfg.IsProduction() {
+				os.Exit(1)
+			}
+		}
+	}
+
+	// 4. Set Gin mode
 	if cfg.IsProduction() {
 		gin.SetMode(gin.ReleaseMode)
 	} else {
 		gin.SetMode(gin.DebugMode)
 	}
 
-	// 4. Setup Router & Middleware
+	// 5. Setup Router & Middleware
 	router := gin.New()
 	router.Use(middleware.Recovery())
 	router.Use(middleware.RequestLogger())
 	router.Use(middleware.CORS(cfg.AllowedOrigins))
 
-	// 5. Register Routes
-	healthHandler := health.NewHandler()
+	// 6. Register Health & Readiness Checkers
+	checkers := make(map[string]health.Checker)
+	if db != nil {
+		checkers["database"] = db.Ping
+	} else {
+		checkers["database"] = func(ctx context.Context) error {
+			return errors.New("database not connected")
+		}
+	}
+
+	healthHandler := health.NewHandler(checkers)
 	healthHandler.RegisterRoutes(router)
 
 	// Base API route placeholder for future modules
@@ -60,7 +94,7 @@ func main() {
 		})
 	}
 
-	// 6. Setup HTTP Server
+	// 7. Setup HTTP Server
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      router,
@@ -69,7 +103,7 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// 7. Start server in a background goroutine
+	// 8. Start server in a background goroutine
 	go func() {
 		slog.Info("HTTP server listening", slog.String("addr", server.Addr))
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -78,7 +112,7 @@ func main() {
 		}
 	}()
 
-	// 8. Wait for interrupt signal for graceful shutdown
+	// 9. Wait for interrupt signal for graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	sig := <-quit
@@ -86,10 +120,10 @@ func main() {
 	slog.Info("Shutdown signal received, shutting down gracefully...", slog.String("signal", sig.String()))
 
 	// Context with 10 second timeout for active requests to complete
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
 
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		slog.Error("Server forced to shutdown", slog.Any("error", err))
 		os.Exit(1)
 	}
