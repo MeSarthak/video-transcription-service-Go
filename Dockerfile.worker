@@ -1,17 +1,16 @@
 # syntax=docker/dockerfile:1
 # Build Stage
-FROM golang:1.24-alpine AS builder
+FROM golang:alpine AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache git
+RUN apk add --no-cache git ca-certificates
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
 
-# Build Worker binary
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/bin/worker ./cmd/worker
 
 # Final Stage
@@ -19,14 +18,12 @@ FROM alpine:3.20
 
 WORKDIR /app
 
-# Install FFmpeg, ca-certificates and tzdata
 RUN apk add --no-cache ffmpeg ca-certificates tzdata
 
 COPY --from=builder /app/bin/worker /app/bin/worker
 COPY --from=builder /app/migrations /app/migrations
 COPY .env.example /app/.env
 
-# Prepare scratch disk directory
 RUN mkdir -p /tmp/transcription-jobs
 
 ENTRYPOINT ["/app/bin/worker"]
