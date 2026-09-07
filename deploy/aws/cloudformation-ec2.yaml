@@ -293,9 +293,6 @@ Resources:
           git clone --branch ${GitBranch} https://github.com/MeSarthak/video-transcription-service-Go.git .
 
           echo "=== 4. Generating Production Environment Config ==="
-          JWT_SECRET=$(openssl rand -hex 32)
-          DB_PASSWORD=$(openssl rand -hex 16)
-
           cat <<EOF > /opt/transcribe/.env
           ENV=production
           USE_AWS=true
@@ -305,12 +302,13 @@ Resources:
           SQS_QUEUE_URL=${SQSMainQueue}
           GROQ_API_KEY=${GroqApiKey}
           DB_USER=postgres
-          DB_PASSWORD=$${DB_PASSWORD}
           DB_NAME=transcription_db
-          JWT_SECRET=$${JWT_SECRET}
           JWT_ACCESS_EXPIRY=15m
           JWT_REFRESH_EXPIRY=168h
           EOF
+
+          echo "DB_PASSWORD=$(openssl rand -hex 16)" >> /opt/transcribe/.env
+          echo "JWT_SECRET=$(openssl rand -hex 32)" >> /opt/transcribe/.env
 
           echo "=== 5. Building & Starting Docker Compose Stack ==="
           docker compose -f docker-compose.prod.yml up -d --build
