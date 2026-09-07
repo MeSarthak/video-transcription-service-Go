@@ -1,0 +1,123 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"video-transcription-service/internal/config"
+	"video-transcription-service/internal/database"
+	"video-transcription-service/internal/jobs"
+	"video-transcription-service/internal/queue"
+	"video-transcription-service/internal/storage"
+	"video-transcription-service/internal/videos"
+	"video-transcription-service/internal/worker"
+	"video-transcription-service/pkg/logger"
+)
+
+func main() {
+	// 1. Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 2. Initialize structured logger
+	logger.Init(cfg.LogLevel, cfg.IsProduction())
+	slog.Info("Starting Transcription Worker Service",
+		slog.String("env", cfg.Env),
+		slog.String("log_level", cfg.LogLevel),
+	)
+
+	// 3. Initialize Database connection
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	db, err := database.New(ctx, cfg)
+	if err != nil {
+		slog.Error("Worker failed to connect to database", slog.Any("error", err))
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	// 4. Initialize S3 Storage
+	var storageService storage.Service
+	s3Store, err := storage.NewS3Storage(ctx, cfg.AWSRegion, cfg.S3BucketName)
+	if err != nil {
+		if cfg.IsProduction() {
+			slog.Error("Worker failed to initialize AWS S3", slog.Any("error", err))
+			os.Exit(1)
+		} else {
+			slog.Warn("AWS S3 initialization warning (using mock storage for dev)", slog.Any("error", err))
+			storageService = storage.NewMockStorage()
+		}
+	} else {
+		storageService = s3Store
+	}
+
+	// 5. Initialize SQS Queue
+	var jobQueue queue.Queue
+	sqsQueue, err := queue.NewSQSQueue(ctx, cfg.AWSRegion, cfg.SQSQueueURL)
+	if err != nil {
+		if cfg.IsProduction() {
+			slog.Error("Worker failed to initialize AWS SQS", slog.Any("error", err))
+			os.Exit(1)
+		} else {
+			slog.Warn("AWS SQS initialization warning (using mock queue for dev)", slog.Any("error", err))
+			jobQueue = queue.NewMockQueue()
+		}
+	} else {
+		jobQueue = sqsQueue
+	}
+
+	// 6. Repositories
+	jobRepo := jobs.NewRepository(db.Pool)
+	videoRepo := videos.NewRepository(db.Pool)
+
+	// 7. Temporary mock processor (to be wired with FFmpeg & Transcribe in Phases 8 & 9)
+	processor := func(ctx context.Context, msg *queue.TranscriptionMessage) error {
+		slog.Info("Processing job payload",
+			slog.String("job_id", msg.JobID.String()),
+			slog.String("video_key", msg.S3VideoKey),
+		)
+		// Simulating processing time
+		time.Sleep(100 * time.Millisecond)
+		return nil
+	}
+
+	// Suppress unused storageService warning until Phase 8
+	_ = storageService
+
+	// 8. Start Worker
+	workerEngine := worker.NewWorker(jobQueue, jobRepo, videoRepo, processor)
+
+	// Listen for shutdown signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+
+	workerCtx, workerCancel := context.WithCancel(ctx)
+
+	go func() {
+		if err := workerEngine.Start(workerCtx); err != nil && !errorsIs(err, context.Canceled) {
+			slog.Error("Worker loop exited with error", slog.Any("error", err))
+		}
+	}()
+
+	sig := <-quit
+	slog.Info("Shutdown signal received, gracefully shutting down worker...", slog.String("signal", sig.String()))
+
+	workerCancel()
+
+	// Allow pending in-flight tasks to finish
+	time.Sleep(1 * time.Second)
+	slog.Info("Worker process stopped cleanly")
+}
+
+func errorsIs(err, target error) bool {
+	return err == target
+}
