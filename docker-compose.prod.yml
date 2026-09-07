@@ -20,7 +20,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile.api
+      dockerfile: Dockerfile.api.prod
     container_name: transcribe-api
     restart: always
     depends_on:
@@ -54,7 +54,7 @@ services:
   worker:
     build:
       context: .
-      dockerfile: Dockerfile.worker
+      dockerfile: Dockerfile.worker.prod
     container_name: transcribe-worker
     restart: always
     depends_on:
@@ -86,7 +86,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile.frontend
+      dockerfile: Dockerfile.frontend.prod
     container_name: transcribe-frontend
     restart: always
     depends_on:

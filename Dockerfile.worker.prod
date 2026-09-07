@@ -1,0 +1,13 @@
+FROM alpine:3.20
+
+WORKDIR /app
+
+RUN apk add --no-cache ffmpeg ca-certificates tzdata
+
+COPY bin/worker_linux /app/bin/worker
+COPY migrations /app/migrations
+
+RUN chmod +x /app/bin/worker
+RUN mkdir -p /tmp/transcription-jobs
+
+ENTRYPOINT ["/app/bin/worker"]
