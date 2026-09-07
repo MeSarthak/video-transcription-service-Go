@@ -51,80 +51,127 @@ func NewProcessor(
 	}
 }
 
-// ProcessJob executes the full video download -> FFmpeg audio extraction -> S3 audio upload -> speech-to-text -> DB persistence pipeline.
+// ProcessJob coordinates the end-to-end transcription pipeline.
 func (p *Processor) ProcessJob(ctx context.Context, msg *queue.TranscriptionMessage) error {
 	slog.Info("Starting end-to-end transcription processing pipeline",
 		slog.String("job_id", msg.JobID.String()),
 		slog.String("video_id", msg.VideoID.String()),
 	)
 
-	// 1. Create Isolated Scratch Workspace Directory with defer cleanup
+	// 1. Create isolated scratch workspace
 	scratchDir, cleanup, err := ffmpeg.CreateScratchDir(msg.JobID)
 	if err != nil {
 		return fmt.Errorf("failed to create scratch directory: %w", err)
 	}
 	defer cleanup()
 
-	// 2. Download original video from S3 to local scratch directory
+	// 2. Download original video to local scratch directory
+	localVideoPath, err := p.downloadVideo(ctx, msg.S3VideoKey, scratchDir)
+	if err != nil {
+		return err
+	}
+
+	// 3. Extract and probe audio
+	localAudioPath, duration, err := p.extractAudio(ctx, localVideoPath, scratchDir)
+	if err != nil {
+		return err
+	}
+
+	// 4. Upload extracted audio to storage
+	audioStorageKey, err := p.uploadAudio(ctx, msg.UserID, msg.VideoID, localAudioPath)
+	if err != nil {
+		return err
+	}
+
+	// 5. Transcribe audio with speech-to-text provider
+	result, rawKey, err := p.transcribeAudio(ctx, msg, audioStorageKey, localAudioPath)
+	if err != nil {
+		return err
+	}
+
+	// 6. Persist transcripts, segments, and updated statuses inside a database transaction
+	if err := p.persistResults(ctx, msg, result, rawKey, duration); err != nil {
+		return fmt.Errorf("failed to persist transcription transaction: %w", err)
+	}
+
+	slog.Info("Transcription pipeline completed successfully",
+		slog.String("job_id", msg.JobID.String()),
+		slog.String("video_id", msg.VideoID.String()),
+		slog.Int("segments_count", len(result.Segments)),
+		slog.Float64("duration_sec", duration),
+	)
+
+	return nil
+}
+
+func (p *Processor) downloadVideo(ctx context.Context, s3Key, scratchDir string) (string, error) {
 	localVideoPath := filepath.Join(scratchDir, "original_video")
-	videoReader, err := p.storage.GetObject(ctx, msg.S3VideoKey)
+	reader, err := p.storage.GetObject(ctx, s3Key)
 	if err != nil {
-		return fmt.Errorf("failed to download video from S3 (%s): %w", msg.S3VideoKey, err)
+		return "", fmt.Errorf("failed to download video from storage (%s): %w", s3Key, err)
 	}
-	defer videoReader.Close()
+	defer reader.Close()
 
-	videoFile, err := os.Create(localVideoPath)
+	file, err := os.Create(localVideoPath)
 	if err != nil {
-		return fmt.Errorf("failed to create local video file: %w", err)
+		return "", fmt.Errorf("failed to create local video file: %w", err)
 	}
-	if _, err := io.Copy(videoFile, videoReader); err != nil {
-		videoFile.Close()
-		return fmt.Errorf("failed to write video to scratch disk: %w", err)
-	}
-	videoFile.Close()
+	defer file.Close()
 
-	// 3. Probe video duration with ffprobe
+	if _, err := io.Copy(file, reader); err != nil {
+		return "", fmt.Errorf("failed to write video to scratch disk: %w", err)
+	}
+	return localVideoPath, nil
+}
+
+func (p *Processor) extractAudio(ctx context.Context, localVideoPath, scratchDir string) (string, float64, error) {
 	duration, _ := p.extractor.GetDuration(ctx, localVideoPath)
 
-	// 4. Extract normalized 16kHz mono audio WAV with FFmpeg
 	localAudioPath := filepath.Join(scratchDir, "extracted_audio.wav")
 	if err := p.extractor.ExtractAudio(ctx, localVideoPath, localAudioPath); err != nil {
-		return fmt.Errorf("FFmpeg audio extraction failed: %w", err)
+		return "", 0, fmt.Errorf("FFmpeg audio extraction failed: %w", err)
 	}
+	return localAudioPath, duration, nil
+}
 
-	// 5. Upload extracted audio to S3
-	audioStorageKey := fmt.Sprintf("audio/%s/%s/audio.wav", msg.UserID.String(), msg.VideoID.String())
+func (p *Processor) uploadAudio(ctx context.Context, userID, videoID uuid.UUID, localAudioPath string) (string, error) {
+	audioStorageKey := fmt.Sprintf("audio/%s/%s/audio.wav", userID.String(), videoID.String())
 	audioData, err := os.ReadFile(localAudioPath)
 	if err != nil {
-		return fmt.Errorf("failed to read extracted audio: %w", err)
+		return "", fmt.Errorf("failed to read extracted audio: %w", err)
 	}
 
 	if err := p.storage.Upload(ctx, audioStorageKey, bytes.NewReader(audioData), "audio/wav"); err != nil {
-		return fmt.Errorf("failed to upload extracted audio to S3: %w", err)
+		return "", fmt.Errorf("failed to upload extracted audio to storage: %w", err)
 	}
+	return audioStorageKey, nil
+}
 
-	// 6. Call Transcription Provider (AWS Transcribe / Mock)
+func (p *Processor) transcribeAudio(ctx context.Context, msg *queue.TranscriptionMessage, audioStorageKey, localAudioPath string) (*transcribe.TranscriptionResult, string, error) {
 	mediaS3URI := fmt.Sprintf("s3://%s/%s", p.bucket, audioStorageKey)
+	rawOutputKey := fmt.Sprintf("transcripts/%s/%s/raw_output.json", msg.UserID.String(), msg.VideoID.String())
+
 	transcribeInput := transcribe.TranscriptionInput{
 		JobID:          msg.JobID.String(),
 		MediaS3URI:     mediaS3URI,
 		OutputBucket:   p.bucket,
-		OutputKey:      fmt.Sprintf("transcripts/%s/%s/raw_output.json", msg.UserID.String(), msg.VideoID.String()),
+		OutputKey:      rawOutputKey,
 		LanguageCode:   msg.Language,
 		LocalAudioPath: localAudioPath,
 	}
 
 	result, err := p.provider.Transcribe(ctx, transcribeInput)
 	if err != nil {
-		return fmt.Errorf("transcription provider error: %w", err)
+		return nil, "", fmt.Errorf("transcription provider error: %w", err)
 	}
+	return result, rawOutputKey, nil
+}
 
-	// 7. Persist Transcripts and Segments inside a Database Transaction
+func (p *Processor) persistResults(ctx context.Context, msg *queue.TranscriptionMessage, result *transcribe.TranscriptionResult, rawS3Key string, duration float64) error {
 	transcriptID := uuid.New()
-	rawS3Key := transcribeInput.OutputKey
 
-	err = p.db.WithTx(ctx, func(tx pgx.Tx) error {
-		// Insert or update transcript, returning the actual ID in the table
+	return p.db.WithTx(ctx, func(tx pgx.Tx) error {
+		// 1. Upsert transcript
 		var actualTranscriptID uuid.UUID
 		insertTranscriptSQL := `
 			INSERT INTO transcripts (id, video_id, job_id, language, full_text, raw_s3_key)
@@ -135,13 +182,15 @@ func (p *Processor) ProcessJob(ctx context.Context, msg *queue.TranscriptionMess
 		`
 		err := tx.QueryRow(ctx, insertTranscriptSQL, transcriptID, msg.VideoID, msg.JobID, result.Language, result.FullText, rawS3Key).Scan(&actualTranscriptID)
 		if err != nil {
-			return fmt.Errorf("failed to insert transcript: %w", err)
+			return fmt.Errorf("failed to upsert transcript: %w", err)
 		}
 
-		// Delete any existing segments for this transcript
-		_, _ = tx.Exec(ctx, `DELETE FROM transcript_segments WHERE transcript_id = $1`, actualTranscriptID)
+		// 2. Clear old segments
+		if _, err := tx.Exec(ctx, `DELETE FROM transcript_segments WHERE transcript_id = $1`, actualTranscriptID); err != nil {
+			return fmt.Errorf("failed to delete old segments: %w", err)
+		}
 
-		// Insert segments
+		// 3. Batch insert new segments
 		insertSegmentSQL := `
 			INSERT INTO transcript_segments (id, transcript_id, sequence_number, start_time, end_time, text, confidence)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -157,49 +206,34 @@ func (p *Processor) ProcessJob(ctx context.Context, msg *queue.TranscriptionMess
 				seg.Confidence,
 			)
 			if err != nil {
-				return fmt.Errorf("failed to insert transcript segment #%d: %w", seg.SequenceNumber, err)
+				return fmt.Errorf("failed to insert segment #%d: %w", seg.SequenceNumber, err)
 			}
 		}
 
-		// Update Job Status to Completed
+		// 4. Mark job as completed
 		updateJobSQL := `
 			UPDATE transcription_jobs
 			SET status = $1, completed_at = NOW(), updated_at = NOW()
 			WHERE id = $2
 		`
-		_, err = tx.Exec(ctx, updateJobSQL, jobs.StatusCompleted, msg.JobID)
-		if err != nil {
+		if _, err := tx.Exec(ctx, updateJobSQL, jobs.StatusCompleted, msg.JobID); err != nil {
 			return fmt.Errorf("failed to mark job completed: %w", err)
 		}
 
-		// Update Video Status to Completed & record duration
+		// 5. Mark video as completed with duration
+		var durPtr *float64
+		if duration > 0 {
+			durPtr = &duration
+		}
 		updateVideoSQL := `
 			UPDATE videos
 			SET status = $1, duration_seconds = COALESCE($2, duration_seconds), updated_at = NOW()
 			WHERE id = $3
 		`
-		var durPtr *float64
-		if duration > 0 {
-			durPtr = &duration
-		}
-		_, err = tx.Exec(ctx, updateVideoSQL, videos.StatusCompleted, durPtr, msg.VideoID)
-		if err != nil {
+		if _, err := tx.Exec(ctx, updateVideoSQL, videos.StatusCompleted, durPtr, msg.VideoID); err != nil {
 			return fmt.Errorf("failed to mark video completed: %w", err)
 		}
 
 		return nil
 	})
-
-	if err != nil {
-		return fmt.Errorf("failed to persist transcription transaction: %w", err)
-	}
-
-	slog.Info("Transcription pipeline completed successfully",
-		slog.String("job_id", msg.JobID.String()),
-		slog.String("video_id", msg.VideoID.String()),
-		slog.Int("segments_count", len(result.Segments)),
-		slog.Float64("duration_sec", duration),
-	)
-
-	return nil
 }

@@ -45,19 +45,14 @@ func FormatTXT(fullText string) string {
 }
 
 func formatSRTTime(seconds float64) string {
-	hours := int(seconds / 3600)
-	minutes := int(math.Mod(seconds, 3600) / 60)
-	secs := int(math.Mod(seconds, 60))
-	millis := int(math.Round(math.Mod(seconds, 1) * 1000))
-
-	if millis >= 1000 {
-		millis = 999
-	}
-
-	return fmt.Sprintf("%02d:%02d:%02d,%03d", hours, minutes, secs, millis)
+	return formatTimestamp(seconds, ",")
 }
 
 func formatVTTTime(seconds float64) string {
+	return formatTimestamp(seconds, ".")
+}
+
+func formatTimestamp(seconds float64, sep string) string {
 	hours := int(seconds / 3600)
 	minutes := int(math.Mod(seconds, 3600) / 60)
 	secs := int(math.Mod(seconds, 60))
@@ -67,5 +62,5 @@ func formatVTTTime(seconds float64) string {
 		millis = 999
 	}
 
-	return fmt.Sprintf("%02d:%02d:%02d.%03d", hours, minutes, secs, millis)
+	return fmt.Sprintf("%02d:%02d:%02d%s%03d", hours, minutes, secs, sep, millis)
 }

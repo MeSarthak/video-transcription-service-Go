@@ -54,8 +54,8 @@ func TestMockStorageService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get object failed: %v", err)
 	}
-	defer reader.Close()
 	data, _ := io.ReadAll(reader)
+	reader.Close()
 	if string(data) != content {
 		t.Errorf("content mismatch: got %s", string(data))
 	}

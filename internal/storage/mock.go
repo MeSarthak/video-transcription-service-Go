@@ -91,7 +91,9 @@ func (m *MockStorage) DeleteObject(ctx context.Context, key string) error {
 
 	delete(m.Objects, key)
 	delete(m.Meta, key)
-	_ = os.Remove(m.filePath(key))
+	if err := os.Remove(m.filePath(key)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
 	return nil
 }
 
