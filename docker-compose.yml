@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 16 Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: transcribe-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-transcription_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-transcription_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Go API Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: transcribe-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: "8080"
+      SERVER_ENV: "development"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-transcription_db}
+      DB_SSLMODE: "disable"
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-signing-key-32-chars-long!}
+      JWT_ACCESS_EXPIRY: "15m"
+      JWT_REFRESH_EXPIRY: "168h"
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-transcription-service-videos}
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
+    ports:
+      - "8080:8080"
+
+  # Go Background Worker with FFmpeg
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: transcribe-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_ENV: "development"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-transcription_db}
+      DB_SSLMODE: "disable"
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-transcription-service-videos}
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
+
+  # React HeroUI Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: transcribe-frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "3000:80"
+
+volumes:
+  postgres_data:
