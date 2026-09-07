@@ -6,7 +6,6 @@ import {
   CardHeader,
   Input,
   Button,
-  Divider,
 } from '@heroui/react';
 import { Mail, Lock, Video as VideoIcon, ArrowRight, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';

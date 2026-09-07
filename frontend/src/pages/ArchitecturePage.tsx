@@ -7,7 +7,6 @@ import {
   CardHeader,
   Button,
   Chip,
-  Divider,
 } from '@heroui/react';
 import {
   Cpu,
@@ -22,7 +21,6 @@ import {
   MessageSquare,
   Activity,
   Code2,
-  FileCheck2,
   RefreshCw,
   Sparkles,
   GitBranch,

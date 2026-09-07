@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	ErrObjectNotFound = errors.New("object not found in storage")
+	ErrObjectNotFound  = errors.New("object not found in storage")
 	ErrStorageOpFailed = errors.New("storage operation failed")
 )
 

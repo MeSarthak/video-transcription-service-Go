@@ -3,14 +3,10 @@ import { useParams, Link } from 'react-router-dom';
 import {
   Button,
   Spinner,
-  Chip,
 } from '@heroui/react';
 import {
   ArrowLeft,
   RefreshCw,
-  Clock,
-  HardDrive,
-  Sparkles,
   AlertCircle,
   Play,
   CheckCircle2,
@@ -71,9 +67,12 @@ export const VideoDetailPage: React.FC = () => {
   }, [id]);
 
   const videoRef = useRef(video);
-  videoRef.current = video;
   const jobRef = useRef(job);
-  jobRef.current = job;
+
+  useEffect(() => {
+    videoRef.current = video;
+    jobRef.current = job;
+  }, [video, job]);
 
   // Initial load
   useEffect(() => {

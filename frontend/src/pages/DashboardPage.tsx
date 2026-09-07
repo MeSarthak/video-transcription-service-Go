@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Button,
-  Card,
-  CardBody,
   Input,
   Modal,
   ModalContent,
@@ -21,12 +19,9 @@ import {
   Trash2,
   Play,
   RefreshCw,
-  Clock,
   MoreVertical,
-  Layers,
   FileVideo,
   CheckCircle2,
-  Zap,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { Video } from '../types';
@@ -43,7 +38,10 @@ export const DashboardPage: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
 
   const videosRef = useRef(videos);
-  videosRef.current = videos;
+
+  useEffect(() => {
+    videosRef.current = videos;
+  }, [videos]);
 
   const fetchVideos = useCallback(async () => {
     try {
@@ -101,11 +99,6 @@ export const DashboardPage: React.FC = () => {
     if (categoryFilter === 'uploaded') return v.status === 'uploaded';
     return true;
   });
-
-  const formatFileSize = (bytes: number) => {
-    if (!bytes) return '0 MB';
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
 
   const formatDuration = (secs?: number) => {
     if (!secs) return '0:22';

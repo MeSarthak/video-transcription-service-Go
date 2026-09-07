@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	ErrVideoNotFound        = errors.New("video not found")
-	ErrInvalidVideoStatus   = errors.New("invalid video status")
+	ErrVideoNotFound      = errors.New("video not found")
+	ErrInvalidVideoStatus = errors.New("invalid video status")
 )
 
 type Repository interface {

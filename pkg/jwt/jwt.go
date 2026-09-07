@@ -25,7 +25,7 @@ type TokenPair struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	ExpiresIn    int64  `json:"expires_in"` // Access token expiration in seconds
-	TokenType    string `json:"token_type"`  // "Bearer"
+	TokenType    string `json:"token_type"` // "Bearer"
 }
 
 // GenerateTokenPair creates a signed access token and refresh token for a user.

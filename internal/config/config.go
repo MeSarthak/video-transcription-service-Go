@@ -23,10 +23,10 @@ type Config struct {
 	AllowedOrigins []string
 
 	// Database
-	DatabaseURL     string
-	DBMaxOpenConns  int
-	DBMaxIdleConns  int
-	DBMaxIdleTime   time.Duration
+	DatabaseURL    string
+	DBMaxOpenConns int
+	DBMaxIdleConns int
+	DBMaxIdleTime  time.Duration
 
 	// Authentication
 	JWTSecret        string

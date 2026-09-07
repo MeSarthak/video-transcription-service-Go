@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	ErrUserNotFound    = errors.New("user not found")
-	ErrDuplicateEmail  = errors.New("email already in use")
+	ErrUserNotFound   = errors.New("user not found")
+	ErrDuplicateEmail = errors.New("email already in use")
 )
 
 type Repository interface {

@@ -4,10 +4,8 @@ import {
   Button,
   Card,
   CardBody,
-  Chip,
-  Tooltip,
 } from '@heroui/react';
-import { Search, Copy, Check, Play, Clock, Sparkles } from 'lucide-react';
+import { Search, Copy, Check } from 'lucide-react';
 import { TranscriptSegment } from '../types';
 
 interface TranscriptViewerProps {
@@ -46,14 +44,43 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
     setTimeout(() => setCopiedFull(false), 2000);
   };
 
+  const activeSegment = filteredSegments.find(
+    (seg) => currentTime >= seg.start_time && currentTime <= seg.end_time
+  );
+  const prevActiveSeqRef = useRef<number | null>(null);
+
   useEffect(() => {
-    if (autoScroll && activeSegmentRef.current && containerRef.current) {
-      activeSegmentRef.current.scrollIntoView({
+    if (!autoScroll) {
+      prevActiveSeqRef.current = null;
+      return;
+    }
+
+    if (!activeSegment) return;
+
+    if (prevActiveSeqRef.current === activeSegment.sequence_number) return;
+    prevActiveSeqRef.current = activeSegment.sequence_number;
+
+    if (activeSegmentRef.current && containerRef.current) {
+      const container = containerRef.current;
+      const element = activeSegmentRef.current;
+
+      const containerRect = container.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
+
+      // Calculate relative position within the container without affecting window scroll
+      const relativeTop = elementRect.top - containerRect.top;
+      const targetScrollTop =
+        container.scrollTop +
+        relativeTop -
+        container.clientHeight / 2 +
+        elementRect.height / 2;
+
+      container.scrollTo({
+        top: Math.max(0, targetScrollTop),
         behavior: 'smooth',
-        block: 'nearest',
       });
     }
-  }, [currentTime, autoScroll]);
+  }, [currentTime, autoScroll, activeSegment]);
 
   return (
     <Card className="h-full flex flex-col border border-default-200 dark:border-yt-border bg-background dark:bg-yt-dark shadow-lg rounded-2xl overflow-hidden">

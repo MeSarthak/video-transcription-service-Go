@@ -16,30 +16,30 @@ const (
 )
 
 type Video struct {
-	ID              uuid.UUID  `json:"id"`
-	UserID          uuid.UUID  `json:"user_id"`
-	Filename        string     `json:"filename"`
-	StorageKey      string     `json:"storage_key"`
-	ContentType     string     `json:"content_type"`
-	SizeBytes       int64      `json:"size_bytes"`
-	DurationSeconds *float64   `json:"duration_seconds,omitempty"`
-	Status          string     `json:"status"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	ID              uuid.UUID `json:"id"`
+	UserID          uuid.UUID `json:"user_id"`
+	Filename        string    `json:"filename"`
+	StorageKey      string    `json:"storage_key"`
+	ContentType     string    `json:"content_type"`
+	SizeBytes       int64     `json:"size_bytes"`
+	DurationSeconds *float64  `json:"duration_seconds,omitempty"`
+	Status          string    `json:"status"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type VideoResponse struct {
-	ID              uuid.UUID  `json:"id"`
-	UserID          uuid.UUID  `json:"user_id"`
-	Filename        string     `json:"filename"`
-	StorageKey      string     `json:"storage_key"`
-	ContentType     string     `json:"content_type"`
-	SizeBytes       int64      `json:"size_bytes"`
-	DurationSeconds *float64   `json:"duration_seconds,omitempty"`
-	Status          string     `json:"status"`
-	PlaybackURL     string     `json:"playback_url,omitempty"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	ID              uuid.UUID `json:"id"`
+	UserID          uuid.UUID `json:"user_id"`
+	Filename        string    `json:"filename"`
+	StorageKey      string    `json:"storage_key"`
+	ContentType     string    `json:"content_type"`
+	SizeBytes       int64     `json:"size_bytes"`
+	DurationSeconds *float64  `json:"duration_seconds,omitempty"`
+	Status          string    `json:"status"`
+	PlaybackURL     string    `json:"playback_url,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type UploadURLResponse struct {

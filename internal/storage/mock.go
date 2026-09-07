@@ -147,4 +147,3 @@ func (m *MockStorage) GetObject(ctx context.Context, key string) (io.ReadCloser,
 
 	return nil, ErrObjectNotFound
 }
-
