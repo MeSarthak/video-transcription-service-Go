@@ -1,0 +1,99 @@
+services:
+  # PostgreSQL 16 Database with persistent EBS volume
+  postgres:
+    image: postgres:16-alpine
+    container_name: transcribe-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-transcription_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-transcription_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Go API Server (Production Mode + AWS S3 / SQS)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: transcribe-api
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      ENV: "production"
+      USE_AWS: "true"
+      DATABASE_URL: "postgres://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-transcription_db}?sslmode=disable"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-transcription_db}
+      DB_SSLMODE: "disable"
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-secure-random-32-character-secret}
+      JWT_ACCESS_EXPIRY: "15m"
+      JWT_REFRESH_EXPIRY: "168h"
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL}
+    volumes:
+      - shared_storage:/tmp/transcription_storage
+    expose:
+      - "8080"
+
+  # Go Background Worker with FFmpeg + Whisper Transcribe
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: transcribe-worker
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ENV: "production"
+      USE_AWS: "true"
+      DATABASE_URL: "postgres://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-transcription_db}?sslmode=disable"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-transcription_db}
+      DB_SSLMODE: "disable"
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      WHISPER_API_URL: ${WHISPER_API_URL:-}
+      WHISPER_MODEL: ${WHISPER_MODEL:-}
+    volumes:
+      - shared_storage:/tmp/transcription_storage
+
+  # React HeroUI Frontend served with Nginx reverse proxy
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: transcribe-frontend
+    restart: always
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:
+  shared_storage:

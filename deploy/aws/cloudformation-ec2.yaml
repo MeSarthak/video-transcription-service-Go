@@ -1,0 +1,360 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Production & Free-Tier Eligible AWS Infrastructure for Video Transcription Service.
+  Provisions a lightweight VPC, S3 Media Bucket with CORS, SQS Queue with DLQ,
+  IAM Instance Profile, and an EC2 Instance running Docker Compose (Frontend, API, Worker, PostgreSQL).
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+      - t3.micro
+      - t2.micro
+      - t3.small
+      - t3.medium
+    Description: >
+      EC2 Instance Type. Use t3.micro or t2.micro for AWS 12-Month Free Tier.
+      t3.small or t3.medium provides faster build and transcription speeds.
+
+  GroqApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: >
+      (Recommended) Your Groq API Key for ultra-fast Whisper speech-to-text transcription.
+      Leave empty if you plan to add it manually to /opt/transcribe/.env later.
+
+  GitBranch:
+    Type: String
+    Default: master
+    Description: Git branch to clone and deploy.
+
+  LatestUbuntuAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id'
+    Description: Automatically queries Canonical's official Ubuntu 24.04 LTS AMI in the current AWS region.
+
+Resources:
+  # ============================================================================
+  # 1. Networking (Isolated VPC & Public Subnet)
+  # ============================================================================
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: transcribe-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: transcribe-igw
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: transcribe-public-subnet
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: transcribe-public-rt
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref RouteTable
+
+  # ============================================================================
+  # 2. Security Group (Port 80 HTTP, Port 22 SSH)
+  # ============================================================================
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Video Transcription Service
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: Web HTTP traffic
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+          Description: SSH administration (optional)
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic (Docker, S3, SQS, Groq API)
+      Tags:
+        - Key: Name
+          Value: transcribe-sg
+
+  # ============================================================================
+  # 3. AWS S3 Storage (Private Media Bucket with CORS)
+  # ============================================================================
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - '*'
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+              - HEAD
+            AllowedOrigins:
+              - '*'
+            ExposedHeaders:
+              - ETag
+              - Accept-Ranges
+              - Content-Range
+              - Content-Encoding
+              - Content-Length
+            MaxAge: 3600
+      Tags:
+        - Key: App
+          Value: VideoTranscriptionService
+
+  # ============================================================================
+  # 4. AWS SQS Queues (Main Queue + Dead-Letter Queue)
+  # ============================================================================
+  SQSDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'transcribe-jobs-dlq-${AWS::StackName}'
+      MessageRetentionPeriod: 1209600 # 14 days
+
+  SQSMainQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'transcribe-jobs-${AWS::StackName}'
+      VisibilityTimeout: 300 # 5 minutes (matches transcription job length)
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt SQSDLQ.Arn
+        maxReceiveCount: 3
+
+  # ============================================================================
+  # 5. IAM Role & Instance Profile (No hardcoded credentials!)
+  # ============================================================================
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: TranscribeS3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:HeadObject
+                Resource: !Sub '${S3Bucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !GetAtt S3Bucket.Arn
+        - PolicyName: TranscribeSQSAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:ChangeMessageVisibility
+                Resource:
+                  - !GetAtt SQSMainQueue.Arn
+                  - !GetAtt SQSDLQ.Arn
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2Role
+
+  # ============================================================================
+  # 6. EC2 Instance (Automated Bootstrap & Systemd Service)
+  # ============================================================================
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - DefaultRoute
+      - S3Bucket
+      - SQSMainQueue
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref LatestUbuntuAmiId
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 25 # Free Tier supports up to 30 GB
+            VolumeType: gp3
+            DeleteOnTermination: true
+      Tags:
+        - Key: Name
+          Value: transcribe-server
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -e
+          exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+
+          echo "=== 1. Setting up 2GB Swap space (crucial for Free Tier t3.micro) ==="
+          if [ ! -f /swapfile ]; then
+            fallocate -l 2G /swapfile
+            chmod 600 /swapfile
+            mkswap /swapfile
+            swapon /swapfile
+            echo '/swapfile none swap sw 0 0' >> /etc/fstab
+          fi
+
+          echo "=== 2. Installing Docker & Docker Compose ==="
+          apt-get update -y
+          apt-get install -y ca-certificates curl gnupg git
+
+          install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          chmod a+r /etc/apt/keyrings/docker.gpg
+
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+            $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+            tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+          apt-get update -y
+          apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+          systemctl enable docker
+          systemctl start docker
+          usermod -aG docker ubuntu
+
+          echo "=== 3. Cloning Application Codebase ==="
+          mkdir -p /opt/transcribe
+          cd /opt/transcribe
+          git clone --branch ${GitBranch} https://github.com/MeSarthak/video-transcription-service-Go.git .
+
+          echo "=== 4. Generating Production Environment Config ==="
+          JWT_SECRET=$(openssl rand -hex 32)
+          DB_PASSWORD=$(openssl rand -hex 16)
+
+          cat <<EOF > /opt/transcribe/.env
+          ENV=production
+          USE_AWS=true
+          PORT=8080
+          AWS_REGION=${AWS::Region}
+          S3_BUCKET_NAME=${S3Bucket}
+          SQS_QUEUE_URL=${SQSMainQueue}
+          GROQ_API_KEY=${GroqApiKey}
+          DB_USER=postgres
+          DB_PASSWORD=$${DB_PASSWORD}
+          DB_NAME=transcription_db
+          JWT_SECRET=$${JWT_SECRET}
+          JWT_ACCESS_EXPIRY=15m
+          JWT_REFRESH_EXPIRY=168h
+          EOF
+
+          echo "=== 5. Building & Starting Docker Compose Stack ==="
+          docker compose -f docker-compose.prod.yml up -d --build
+
+          echo "=== 6. Registering Systemd Service (ensures auto-start on EC2 Reboot/Start) ==="
+          cat <<EOF > /etc/systemd/system/transcribe-stack.service
+          [Unit]
+          Description=Video Transcription Docker Compose Stack
+          Requires=docker.service
+          After=docker.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          WorkingDirectory=/opt/transcribe
+          ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml up -d
+          ExecStop=/usr/bin/docker compose -f docker-compose.prod.yml down
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          systemctl daemon-reload
+          systemctl enable transcribe-stack.service
+
+          echo "=== Deployment Completed Successfully! ==="
+
+Outputs:
+  WebsiteURL:
+    Description: Public HTTP URL for your Video Transcription Service
+    Value: !Sub 'http://${EC2Instance.PublicIp}'
+
+  EC2PublicDns:
+    Description: Public DNS Name of the EC2 Instance
+    Value: !GetAtt EC2Instance.PublicDnsName
+
+  EC2InstanceId:
+    Description: EC2 Instance ID (use in AWS Console to Stop/Start the instance to save money)
+    Value: !Ref EC2Instance
+
+  S3BucketName:
+    Description: Created S3 Bucket storing videos, audio, and transcripts
+    Value: !Ref S3Bucket
+
+  SQSQueueURL:
+    Description: Created SQS Queue URL processing transcription jobs
+    Value: !Ref SQSMainQueue

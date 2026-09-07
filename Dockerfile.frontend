@@ -17,8 +17,8 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Custom nginx reverse proxy configuration for SPA routing & API proxy
 RUN echo 'server {' \
-    '  listen 80;' \
-    '  server_name localhost;' \
+    '  listen 80 default_server;' \
+    '  server_name _;' \
     '  location / {' \
     '    root /usr/share/nginx/html;' \
     '    index index.html;' \

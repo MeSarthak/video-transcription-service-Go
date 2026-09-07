@@ -102,9 +102,15 @@ func (c *Config) IsProduction() bool {
 }
 
 func (c *Config) HasAWSCredentials() bool {
-	accessKey := os.Getenv("AWS_ACCESS_KEY_ID")
-	secretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
-	return accessKey != "" && secretKey != ""
+	// 1. Explicit static AWS credentials in environment variables
+	if os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != "" {
+		return true
+	}
+	// 2. Production or explicit AWS cloud environment (uses EC2 IAM Instance Profile or ECS Task Role via AWS SDK default chain)
+	if c.IsProduction() || strings.ToLower(os.Getenv("USE_AWS")) == "true" {
+		return true
+	}
+	return false
 }
 
 func (c *Config) HasWhisperKey() bool {
