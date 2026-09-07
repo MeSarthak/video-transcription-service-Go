@@ -120,21 +120,29 @@ func (m *MockStorage) Upload(ctx context.Context, key string, body io.Reader, co
 	return nil
 }
 
+type readSeekCloser struct {
+	io.ReadSeeker
+}
+
+func (r *readSeekCloser) Close() error {
+	return nil
+}
+
 func (m *MockStorage) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// Check in-memory
-	if data, exists := m.Objects[key]; exists {
-		return io.NopCloser(bytes.NewReader(data)), nil
+	// Check disk first for persisted file (returns *os.File which implements io.ReadSeekCloser)
+	fp := m.filePath(key)
+	if f, err := os.Open(fp); err == nil {
+		return f, nil
 	}
 
-	// Check disk
-	fp := m.filePath(key)
-	f, err := os.Open(fp)
-	if err == nil {
-		return f, nil
+	// Check in-memory
+	if data, exists := m.Objects[key]; exists {
+		return &readSeekCloser{bytes.NewReader(data)}, nil
 	}
 
 	return nil, ErrObjectNotFound
 }
+

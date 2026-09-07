@@ -172,7 +172,7 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground">
             Distributed Video Transcription Engine
           </h1>
-          <p className="text-default-400 text-sm sm:text-base leading-relaxed">
+          <p className="text-default-500 dark:text-zinc-300 text-sm sm:text-base leading-relaxed">
             An enterprise-grade, asynchronous video processing system built with Go, AWS S3, SQS,
             FFmpeg, PostgreSQL, and HeroUI. Engineered for high concurrency, fault tolerance, and zero API memory bottlenecks.
           </p>
@@ -288,12 +288,12 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                   {currentStep.metrics.map((metric, i) => (
                     <div
                       key={i}
-                      className="p-3 rounded-xl bg-default-100/60 dark:bg-default-800/40 border border-default-200/60 dark:border-default-700/40"
+                      className="p-3.5 rounded-xl bg-default-100 dark:bg-yt-card border border-default-200 dark:border-yt-border shadow-sm"
                     >
-                      <p className="text-[11px] text-default-400 font-medium uppercase tracking-wider">
+                      <p className="text-xs font-bold uppercase tracking-wider text-default-600 dark:text-zinc-200">
                         {metric.label}
                       </p>
-                      <p className="text-base font-bold text-foreground mt-0.5">{metric.value}</p>
+                      <p className="text-lg font-bold text-foreground mt-1">{metric.value}</p>
                     </div>
                   ))}
                 </div>
@@ -301,7 +301,7 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                 {/* Code Snippet Box */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-default-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-default-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
                       <Code2 className="w-3.5 h-3.5 text-primary" /> Implementation Snapshot (Go)
                     </span>
                   </div>
@@ -331,7 +331,7 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                   <Server className="w-6 h-6" />
                 </div>
                 <h3 className="font-bold text-base text-foreground">Go REST API Server</h3>
-                <p className="text-xs text-default-400 leading-relaxed">
+                <p className="text-xs text-default-500 dark:text-zinc-300 leading-relaxed">
                   High-throughput HTTP server utilizing standard Go net/http + chi. Handles JWT authentication, S3 presigned URL issuance, and CRUD operations with sub-millisecond response latency.
                 </p>
                 <div className="pt-2 border-t border-default-100 dark:border-default-800 flex flex-wrap gap-1">
@@ -348,7 +348,7 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                   <MessageSquare className="w-6 h-6" />
                 </div>
                 <h3 className="font-bold text-base text-foreground">AWS SQS Message Broker</h3>
-                <p className="text-xs text-default-400 leading-relaxed">
+                <p className="text-xs text-default-500 dark:text-zinc-300 leading-relaxed">
                   Decouples video upload traffic spikes from media transcoding. Offers 20-second long polling, message deduplication, and isolated queueing for resilient worker load leveling.
                 </p>
                 <div className="pt-2 border-t border-default-100 dark:border-default-800 flex flex-wrap gap-1">
@@ -365,7 +365,7 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                   <Zap className="w-6 h-6" />
                 </div>
                 <h3 className="font-bold text-base text-foreground">Asynchronous Worker Daemon</h3>
-                <p className="text-xs text-default-400 leading-relaxed">
+                <p className="text-xs text-default-500 dark:text-zinc-300 leading-relaxed">
                   Autonomous Go worker consuming SQS messages. Features visibility heartbeat renewal, ephemeral scratch directory isolation, and FFmpeg audio extraction.
                 </p>
                 <div className="pt-2 border-t border-default-100 dark:border-default-800 flex flex-wrap gap-1">
@@ -382,7 +382,7 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                   <HardDrive className="w-6 h-6" />
                 </div>
                 <h3 className="font-bold text-base text-foreground">AWS S3 Object Storage</h3>
-                <p className="text-xs text-default-400 leading-relaxed">
+                <p className="text-xs text-default-500 dark:text-zinc-300 leading-relaxed">
                   Stores raw user videos, extracted audio WAVs, and subtitle artifacts. Uploads occur client-direct via presigned URLs with 15-minute validity.
                 </p>
                 <div className="pt-2 border-t border-default-100 dark:border-default-800 flex flex-wrap gap-1">
@@ -399,7 +399,7 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                   <Database className="w-6 h-6" />
                 </div>
                 <h3 className="font-bold text-base text-foreground">PostgreSQL 16 Engine</h3>
-                <p className="text-xs text-default-400 leading-relaxed">
+                <p className="text-xs text-default-500 dark:text-zinc-300 leading-relaxed">
                   Relational data persistence with foreign keys, indexes on video_id, and ON DELETE CASCADE. Managed via golang-migrate and thread-safe pgxpool.
                 </p>
                 <div className="pt-2 border-t border-default-100 dark:border-default-800 flex flex-wrap gap-1">
@@ -416,7 +416,7 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                   <Sparkles className="w-6 h-6" />
                 </div>
                 <h3 className="font-bold text-base text-foreground">Speech-to-Text Transcribe</h3>
-                <p className="text-xs text-default-400 leading-relaxed">
+                <p className="text-xs text-default-500 dark:text-zinc-300 leading-relaxed">
                   Pluggable speech recognition engine supporting AWS Transcribe and zero-dependency local mock doubles for offline testing and continuous integration.
                 </p>
                 <div className="pt-2 border-t border-default-100 dark:border-default-800 flex flex-wrap gap-1">
@@ -449,9 +449,9 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                 </CardHeader>
                 <CardBody className="p-3 font-mono text-xs space-y-1.5">
                   <div className="flex justify-between text-primary font-bold"><span>id</span><span>UUID PK</span></div>
-                  <div className="flex justify-between text-default-500"><span>email</span><span>VARCHAR UNIQUE</span></div>
-                  <div className="flex justify-between text-default-500"><span>password_hash</span><span>VARCHAR</span></div>
-                  <div className="flex justify-between text-default-400"><span>created_at</span><span>TIMESTAMPTZ</span></div>
+                  <div className="flex justify-between text-default-500 dark:text-zinc-300"><span>email</span><span>VARCHAR UNIQUE</span></div>
+                  <div className="flex justify-between text-default-500 dark:text-zinc-300"><span>password_hash</span><span>VARCHAR</span></div>
+                  <div className="flex justify-between text-default-400 dark:text-zinc-400"><span>created_at</span><span>TIMESTAMPTZ</span></div>
                 </CardBody>
               </Card>
 
@@ -464,10 +464,10 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                 <CardBody className="p-3 font-mono text-xs space-y-1.5">
                   <div className="flex justify-between text-primary font-bold"><span>id</span><span>UUID PK</span></div>
                   <div className="flex justify-between text-secondary"><span>user_id</span><span>UUID FK -&gt; users</span></div>
-                  <div className="flex justify-between text-default-500"><span>title</span><span>VARCHAR</span></div>
-                  <div className="flex justify-between text-default-500"><span>s3_key</span><span>VARCHAR</span></div>
-                  <div className="flex justify-between text-default-500"><span>status</span><span>VARCHAR</span></div>
-                  <div className="flex justify-between text-default-400"><span>duration_seconds</span><span>FLOAT</span></div>
+                  <div className="flex justify-between text-default-500 dark:text-zinc-300"><span>title</span><span>VARCHAR</span></div>
+                  <div className="flex justify-between text-default-500 dark:text-zinc-300"><span>s3_key</span><span>VARCHAR</span></div>
+                  <div className="flex justify-between text-default-500 dark:text-zinc-300"><span>status</span><span>VARCHAR</span></div>
+                  <div className="flex justify-between text-default-400 dark:text-zinc-400"><span>duration_seconds</span><span>FLOAT</span></div>
                 </CardBody>
               </Card>
 
@@ -480,9 +480,9 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                 <CardBody className="p-3 font-mono text-xs space-y-1.5">
                   <div className="flex justify-between text-primary font-bold"><span>id</span><span>UUID PK</span></div>
                   <div className="flex justify-between text-secondary"><span>video_id</span><span>UUID FK -&gt; videos</span></div>
-                  <div className="flex justify-between text-default-500"><span>status</span><span>VARCHAR</span></div>
-                  <div className="flex justify-between text-default-500"><span>retry_count</span><span>INT (max 3)</span></div>
-                  <div className="flex justify-between text-default-400"><span>error_message</span><span>TEXT</span></div>
+                  <div className="flex justify-between text-default-500 dark:text-zinc-300"><span>status</span><span>VARCHAR</span></div>
+                  <div className="flex justify-between text-default-500 dark:text-zinc-300"><span>retry_count</span><span>INT (max 3)</span></div>
+                  <div className="flex justify-between text-default-400 dark:text-zinc-400"><span>error_message</span><span>TEXT</span></div>
                 </CardBody>
               </Card>
 
@@ -495,9 +495,9 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                 <CardBody className="p-3 font-mono text-xs space-y-1.5">
                   <div className="flex justify-between text-primary font-bold"><span>id</span><span>UUID PK</span></div>
                   <div className="flex justify-between text-secondary"><span>video_id</span><span>UUID FK -&gt; videos</span></div>
-                  <div className="flex justify-between text-default-500"><span>language_code</span><span>VARCHAR</span></div>
-                  <div className="flex justify-between text-default-500"><span>full_text</span><span>TEXT</span></div>
-                  <div className="flex justify-between text-default-400"><span>provider</span><span>VARCHAR</span></div>
+                  <div className="flex justify-between text-default-500 dark:text-zinc-300"><span>language_code</span><span>VARCHAR</span></div>
+                  <div className="flex justify-between text-default-500 dark:text-zinc-300"><span>full_text</span><span>TEXT</span></div>
+                  <div className="flex justify-between text-default-400 dark:text-zinc-400"><span>provider</span><span>VARCHAR</span></div>
                 </CardBody>
               </Card>
 
@@ -510,10 +510,10 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                 <CardBody className="p-3 font-mono text-xs space-y-1.5">
                   <div className="flex justify-between text-primary font-bold"><span>id</span><span>UUID PK</span></div>
                   <div className="flex justify-between text-secondary"><span>transcript_id</span><span>UUID FK -&gt; transcripts</span></div>
-                  <div className="flex justify-between text-default-500"><span>start_time</span><span>FLOAT</span></div>
-                  <div className="flex justify-between text-default-500"><span>end_time</span><span>FLOAT</span></div>
-                  <div className="flex justify-between text-default-500"><span>text</span><span>TEXT</span></div>
-                  <div className="flex justify-between text-default-400"><span>confidence</span><span>FLOAT</span></div>
+                  <div className="flex justify-between text-default-500 dark:text-zinc-300"><span>start_time</span><span>FLOAT</span></div>
+                  <div className="flex justify-between text-default-500 dark:text-zinc-300"><span>end_time</span><span>FLOAT</span></div>
+                  <div className="flex justify-between text-default-500 dark:text-zinc-300"><span>text</span><span>TEXT</span></div>
+                  <div className="flex justify-between text-default-400 dark:text-zinc-400"><span>confidence</span><span>FLOAT</span></div>
                 </CardBody>
               </Card>
             </div>
@@ -538,7 +538,7 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                     <Activity className="w-5 h-5" />
                     <h4>Visibility Heartbeat Goroutine</h4>
                   </div>
-                  <p className="text-xs text-default-400 leading-relaxed">
+                  <p className="text-xs text-default-500 dark:text-zinc-300 leading-relaxed">
                     Long video transcriptions can exceed standard SQS visibility timeouts (30s). A concurrent goroutine refreshes message visibility every 20 seconds, ensuring worker monopolization without duplicate work assignment.
                   </p>
                 </CardBody>
@@ -550,7 +550,7 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                     <RefreshCw className="w-5 h-5" />
                     <h4>Idempotent Processing & Retry Limits</h4>
                   </div>
-                  <p className="text-xs text-default-400 leading-relaxed">
+                  <p className="text-xs text-default-500 dark:text-zinc-300 leading-relaxed">
                     Before processing, workers check if a job is already 'completed' or 'processing'. If retries exceed 3, the job is marked 'failed' to prevent poison pill loops from stalling queue consumers.
                   </p>
                 </CardBody>
@@ -562,7 +562,7 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                     <Zap className="w-5 h-5" />
                     <h4>Scratch Disk Ephemeral Cleanup</h4>
                   </div>
-                  <p className="text-xs text-default-400 leading-relaxed">
+                  <p className="text-xs text-default-500 dark:text-zinc-300 leading-relaxed">
                     Every media transcoding job receives a sandboxed /tmp/transcription-jobs/{'{job_id}'}/ directory. Go defer guarantees 100% disk reclamation regardless of processing success or panic recovery.
                   </p>
                 </CardBody>
@@ -574,7 +574,7 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                     <ShieldCheck className="w-5 h-5" />
                     <h4>Zero-Cloud Local Test Doubles</h4>
                   </div>
-                  <p className="text-xs text-default-400 leading-relaxed">
+                  <p className="text-xs text-default-500 dark:text-zinc-300 leading-relaxed">
                     Thread-safe in-memory implementations (MockStorage, MockQueue, MockTranscribeProvider) allow instantaneous local development and CI testing without requiring active AWS accounts or incurring cloud bills.
                   </p>
                 </CardBody>
@@ -597,7 +597,7 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
             <Card className="border border-default-200 dark:border-default-800 bg-background/50 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-default-100/50 dark:bg-default-800/30 text-default-500 uppercase tracking-wider font-semibold border-b border-default-200 dark:border-default-800">
+                  <thead className="bg-default-100/50 dark:bg-default-800/30 text-default-500 dark:text-zinc-400 uppercase tracking-wider font-semibold border-b border-default-200 dark:border-default-800">
                     <tr>
                       <th className="p-4">Design Choice</th>
                       <th className="p-4 text-primary">Selected Solution</th>
@@ -609,26 +609,26 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
                     <tr>
                       <td className="p-4 font-bold text-foreground">Media Uploads</td>
                       <td className="p-4 font-semibold text-primary">S3 Presigned Direct Upload</td>
-                      <td className="p-4 text-default-400">API Gateway Multipart Proxy</td>
-                      <td className="p-4 text-default-400">Eliminates Go server RAM saturation and socket timeouts on large video files.</td>
+                      <td className="p-4 text-default-500 dark:text-zinc-300">API Gateway Multipart Proxy</td>
+                      <td className="p-4 text-default-500 dark:text-zinc-300">Eliminates Go server RAM saturation and socket timeouts on large video files.</td>
                     </tr>
                     <tr>
                       <td className="p-4 font-bold text-foreground">Queue Technology</td>
                       <td className="p-4 font-semibold text-primary">AWS SQS with Long Polling</td>
-                      <td className="p-4 text-default-400">Apache Kafka / RabbitMQ</td>
-                      <td className="p-4 text-default-400">Zero broker cluster management, automatic visibility extension, and serverless scaling.</td>
+                      <td className="p-4 text-default-500 dark:text-zinc-300">Apache Kafka / RabbitMQ</td>
+                      <td className="p-4 text-default-500 dark:text-zinc-300">Zero broker cluster management, automatic visibility extension, and serverless scaling.</td>
                     </tr>
                     <tr>
                       <td className="p-4 font-bold text-foreground">Worker Language</td>
                       <td className="p-4 font-semibold text-primary">Go (Goroutines + slog)</td>
-                      <td className="p-4 text-default-400">Python / Celery</td>
-                      <td className="p-4 text-default-400">Low-latency subprocess execution, single binary deployment, minimal CPU overhead.</td>
+                      <td className="p-4 text-default-500 dark:text-zinc-300">Python / Celery</td>
+                      <td className="p-4 text-default-500 dark:text-zinc-300">Low-latency subprocess execution, single binary deployment, minimal CPU overhead.</td>
                     </tr>
                     <tr>
                       <td className="p-4 font-bold text-foreground">Database Transactions</td>
                       <td className="p-4 font-semibold text-primary">PostgreSQL WithTx Helper</td>
-                      <td className="p-4 text-default-400">Non-relational Document DB</td>
-                      <td className="p-4 text-default-400">ACID atomicity across transcript and hundreds of millisecond subtitle segments.</td>
+                      <td className="p-4 text-default-500 dark:text-zinc-300">Non-relational Document DB</td>
+                      <td className="p-4 text-default-500 dark:text-zinc-300">ACID atomicity across transcript and hundreds of millisecond subtitle segments.</td>
                     </tr>
                   </tbody>
                 </table>

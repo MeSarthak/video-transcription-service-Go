@@ -2,7 +2,9 @@ package storage
 
 import (
 	"errors"
+	"io"
 	"net/http"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,6 +22,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	{
 		storageGroup.PUT("/upload", h.Upload)
 		storageGroup.GET("/playback", h.Playback)
+		storageGroup.HEAD("/playback", h.Playback)
 	}
 }
 
@@ -70,6 +73,16 @@ func (h *Handler) Playback(c *gin.Context) {
 	contentType := meta.ContentType
 	if contentType == "" {
 		contentType = "video/mp4"
+	}
+
+	c.Header("Content-Type", contentType)
+	c.Header("Accept-Ranges", "bytes")
+
+	// If the reader implements io.ReadSeeker, use Go's standard http.ServeContent which handles
+	// RFC-compliant Range requests (HTTP 206 Partial Content), Content-Range, seeking, and HEAD
+	if rs, ok := rc.(io.ReadSeeker); ok {
+		http.ServeContent(c.Writer, c.Request, filepath.Base(key), meta.LastModified, rs)
+		return
 	}
 
 	c.DataFromReader(http.StatusOK, meta.SizeBytes, contentType, rc, nil)

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "improve-codebase": {
+      "source": "tomzx/agents",
+      "sourceType": "github",
+      "skillPath": "skills/improve-codebase/SKILL.md",
+      "computedHash": "80d651bc1a753449f76bac4c5893d8b4feb19d93d46cb79e69abbbf806980698"
+    },
+    "solid": {
+      "source": "ramziddin/solid-skills",
+      "sourceType": "github",
+      "skillPath": "skills/solid/SKILL.md",
+      "computedHash": "9f4c0fe1cfbc7b5c480ad492e6b8cc5af52d5531edbabe4dfb359d92f6732f45"
+    }
+  }
+}

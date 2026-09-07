@@ -28,9 +28,9 @@ func CORS(allowedOrigins []string) gin.HandlerFunc {
 			if allowAll || allowedMap[trimmedOrigin] {
 				c.Header("Access-Control-Allow-Origin", origin)
 				c.Header("Access-Control-Allow-Credentials", "true")
-				c.Header("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-				c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
-				c.Header("Access-Control-Expose-Headers", "Content-Length, Content-Disposition")
+				c.Header("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, Range")
+				c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH, HEAD")
+				c.Header("Access-Control-Expose-Headers", "Content-Length, Content-Disposition, Content-Range, Accept-Ranges")
 			}
 		}
 

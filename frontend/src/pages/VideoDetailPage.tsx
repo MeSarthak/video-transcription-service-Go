@@ -3,8 +3,6 @@ import { useParams, Link } from 'react-router-dom';
 import {
   Button,
   Spinner,
-  Accordion,
-  AccordionItem,
   Chip,
 } from '@heroui/react';
 import {
@@ -12,7 +10,6 @@ import {
   RefreshCw,
   Clock,
   HardDrive,
-  FileCode,
   Sparkles,
   AlertCircle,
   Play,
@@ -249,12 +246,16 @@ export const VideoDetailPage: React.FC = () => {
           {/* YouTube Expandable Description Box */}
           <div className="p-4 rounded-2xl bg-default-100/70 dark:bg-yt-surface border border-default-200 dark:border-yt-border space-y-3">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-foreground">
-              <span>{(video.size_bytes / (1024 * 1024)).toFixed(1)} MB</span>
-              <span>&bull;</span>
+              {video.size_bytes > 0 && (
+                <>
+                  <span>{(video.size_bytes / (1024 * 1024)).toFixed(1)} MB</span>
+                  <span>&bull;</span>
+                </>
+              )}
               <span>
                 {video.duration_seconds && video.duration_seconds > 0
-                  ? `${video.duration_seconds.toFixed(1)}s duration`
-                  : 'Duration calculated in worker'}
+                  ? `${Math.floor(video.duration_seconds / 60)}m ${Math.floor(video.duration_seconds % 60)}s duration`
+                  : 'Processing duration...'}
               </span>
               <span>&bull;</span>
               <span className="uppercase">{video.content_type || 'video/mp4'}</span>
@@ -285,25 +286,6 @@ export const VideoDetailPage: React.FC = () => {
               </div>
             )}
           </div>
-
-          {/* Model Inspector Accordion */}
-          {segments.length > 0 && (
-            <Accordion variant="bordered" className="border-default-200 dark:border-yt-border">
-              <AccordionItem
-                key="json-inspector"
-                aria-label="Raw Transcription Model Inspector"
-                title={
-                  <span className="text-xs font-semibold text-default-500 uppercase tracking-wider flex items-center gap-2">
-                    <FileCode className="w-4 h-4 text-yt-red" /> Raw JSON Transcript Metadata
-                  </span>
-                }
-              >
-                <pre className="p-4 rounded-xl bg-default-900 text-default-100 text-xs overflow-x-auto max-h-72 font-mono">
-                  {JSON.stringify({ video, job, transcript }, null, 2)}
-                </pre>
-              </AccordionItem>
-            </Accordion>
-          )}
         </div>
 
         {/* RIGHT COLUMN: Interactive YouTube Transcript Drawer (~35% width) */}

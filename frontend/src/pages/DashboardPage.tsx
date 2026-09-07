@@ -296,9 +296,13 @@ export const DashboardPage: React.FC = () => {
                     </Link>
                     <p className="text-xs text-default-400 mt-1">TranscribeX Studio</p>
                     <div className="flex items-center gap-1.5 text-[11px] text-default-400">
-                      <span>{formatFileSize(video.size_bytes)}</span>
-                      <span>&bull;</span>
                       <span className="uppercase font-mono text-[10px]">{video.content_type?.split('/')[1] || 'MP4'}</span>
+                      {video.created_at && (
+                        <>
+                          <span>&bull;</span>
+                          <span>{new Date(video.created_at).toLocaleDateString()}</span>
+                        </>
+                      )}
                     </div>
                   </div>
 
