@@ -84,7 +84,7 @@ func TestVideoService(t *testing.T) {
 		if resp.VideoID == uuid.Nil {
 			t.Errorf("expected valid video ID")
 		}
-		if !strings.Contains(resp.UploadURL, "signed=true") {
+		if !strings.Contains(resp.UploadURL, "upload") && !strings.Contains(resp.UploadURL, "signed=true") {
 			t.Errorf("expected presigned upload URL, got %s", resp.UploadURL)
 		}
 

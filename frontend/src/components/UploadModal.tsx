@@ -6,7 +6,6 @@ import {
   ModalBody,
   ModalFooter,
   Button,
-  Input,
   Progress,
 } from '@heroui/react';
 import { UploadCloud, FileVideo, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -21,7 +20,6 @@ interface UploadModalProps {
 
 export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [file, setFile] = useState<File | null>(null);
-  const [title, setTitle] = useState('');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
@@ -32,9 +30,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
     if (e.target.files && e.target.files[0]) {
       const selected = e.target.files[0];
       setFile(selected);
-      if (!title) {
-        setTitle(selected.name.replace(/\.[^/.]+$/, ''));
-      }
       setError(null);
     }
   };
@@ -44,16 +39,12 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const selected = e.dataTransfer.files[0];
       setFile(selected);
-      if (!title) {
-        setTitle(selected.name.replace(/\.[^/.]+$/, ''));
-      }
       setError(null);
     }
   };
 
   const resetState = () => {
     setFile(null);
-    setTitle('');
     setUploading(false);
     setProgress(0);
     setStatusText('');
@@ -61,27 +52,25 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
   };
 
   const handleUpload = async () => {
-    if (!file || !title.trim()) {
-      setError('Please provide a video file and title');
+    if (!file) {
+      setError('Please select a video or audio file.');
       return;
     }
 
     setUploading(true);
     setError(null);
     setProgress(5);
-    setStatusText('Requesting S3 Presigned URL...');
+    setStatusText('Requesting upload URL...');
 
     try {
       // 1. Request presigned upload URL
       const { upload_url, video_id } = await api.requestUploadUrl({
-        title: title.trim(),
         filename: file.name,
-        file_size: file.size,
-        mime_type: file.type || 'video/mp4',
+        content_type: file.type || 'video/mp4',
       });
 
-      // 2. Upload directly to S3
-      setStatusText('Uploading binary directly to S3...');
+      // 2. Upload directly (S3 or local proxy)
+      setStatusText('Streaming media bytes...');
       await api.uploadToS3(upload_url, file, (percent) => {
         // Map 0-100 progress into 10% - 85% range
         setProgress(10 + Math.round(percent * 0.75));
@@ -89,19 +78,23 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
 
       // 3. Confirm upload
       setProgress(90);
-      setStatusText('Verifying S3 Object & registering video...');
-      const completeRes = await api.completeUpload(video_id);
+      setStatusText('Verifying storage object & metadata...');
+      const video = await api.completeUpload(video_id);
 
       // 4. Dispatch transcription job
-      setProgress(98);
-      setStatusText('Dispatching SQS transcription job...');
-      await api.startTranscription(video_id);
+      setProgress(96);
+      setStatusText('Dispatching transcription job...');
+      try {
+        await api.startTranscription(video_id);
+      } catch (jobErr) {
+        console.warn('Auto transcription trigger notice:', jobErr);
+      }
 
       setProgress(100);
-      setStatusText('Success! Job queued.');
+      setStatusText('Success! Ready.');
 
       setTimeout(() => {
-        onSuccess(completeRes.video);
+        onSuccess(video);
         resetState();
         onClose();
       }, 700);
@@ -132,7 +125,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
         <ModalHeader className="flex flex-col gap-1">
           <h2 className="text-xl font-bold tracking-tight">Upload Video for Transcription</h2>
           <p className="text-xs text-default-400 font-normal">
-            Direct streaming to AWS S3 &bull; Distributed async processing via SQS worker
+            Streaming upload &bull; Asynchronous transcription worker pipeline
           </p>
         </ModalHeader>
 
@@ -145,21 +138,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
           )}
 
           <div className="space-y-4">
-            <Input
-              label="Video Title"
-              placeholder="e.g. Q3 Architecture Overview Keynote"
-              value={title}
-              onValueChange={setTitle}
-              isDisabled={uploading}
-              variant="bordered"
-              isRequired
-            />
-
             <input
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
-              accept="video/*,audio/*"
+              accept="video/*,audio/*,.mp4,.webm,.mov,.mkv,.mp3,.wav,.m4a"
               className="hidden"
             />
 
@@ -175,10 +158,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
                 </div>
                 <div className="text-center">
                   <p className="text-sm font-semibold text-foreground">
-                    Click to browse or drag & drop video
+                    Click to browse or drag & drop media file
                   </p>
                   <p className="text-xs text-default-400 mt-1">
-                    MP4, WebM, MOV, MKV, MP3, WAV (up to 500MB)
+                    MP4, WebM, MOV, MKV, MP3, WAV, M4A (up to 500MB)
                   </p>
                 </div>
               </div>
@@ -191,7 +174,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
                   <div className="truncate">
                     <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
                     <p className="text-xs text-default-400">
-                      {(file.size / (1024 * 1024)).toFixed(2)} MB &bull; {file.type || 'video'}
+                      {(file.size / (1024 * 1024)).toFixed(2)} MB &bull; {file.type || 'media'}
                     </p>
                   </div>
                 </div>
@@ -247,10 +230,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
             color="primary"
             onPress={handleUpload}
             isLoading={uploading}
-            isDisabled={!file || !title.trim()}
+            isDisabled={!file}
             className="shadow-md shadow-primary/20"
           >
-            {uploading ? 'Processing...' : 'Upload & Transcribe'}
+            {uploading ? 'Uploading...' : 'Upload & Transcribe'}
           </Button>
         </ModalFooter>
       </ModalContent>

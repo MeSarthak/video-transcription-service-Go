@@ -22,7 +22,6 @@ RUN apk add --no-cache ffmpeg ca-certificates tzdata
 
 COPY --from=builder /app/bin/worker /app/bin/worker
 COPY --from=builder /app/migrations /app/migrations
-COPY .env.example /app/.env
 
 RUN mkdir -p /tmp/transcription-jobs
 

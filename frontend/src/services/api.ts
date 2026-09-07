@@ -1,5 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { User, Video, Job, Transcript, TranscriptSegment, AuthTokens, UploadUrlResponse } from '../types';
+import { User, Video, Job, Transcript, AuthTokens, UploadUrlResponse } from '../types';
 
 const API_BASE_URL = '/api/v1';
 
@@ -27,11 +27,11 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
-    
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       const refreshToken = localStorage.getItem('refresh_token');
-      
+
       if (refreshToken) {
         try {
           const res = await axios.post<{ tokens: AuthTokens }>(`${API_BASE_URL}/auth/refresh`, {
@@ -40,7 +40,7 @@ apiClient.interceptors.response.use(
           const newTokens = res.data.tokens;
           localStorage.setItem('access_token', newTokens.access_token);
           localStorage.setItem('refresh_token', newTokens.refresh_token);
-          
+
           if (originalRequest.headers) {
             originalRequest.headers.Authorization = `Bearer ${newTokens.access_token}`;
           }
@@ -72,11 +72,11 @@ export const api = {
   },
 
   // Videos
-  getVideos: async (): Promise<{ videos: Video[] }> => {
+  getVideos: async (): Promise<{ videos: Video[]; total: number }> => {
     const res = await apiClient.get('/videos');
     return res.data;
   },
-  getVideo: async (id: string): Promise<{ video: Video }> => {
+  getVideo: async (id: string): Promise<Video> => {
     const res = await apiClient.get(`/videos/${id}`);
     return res.data;
   },
@@ -85,22 +85,23 @@ export const api = {
     return res.data;
   },
   requestUploadUrl: async (data: {
-    title: string;
     filename: string;
-    file_size: number;
-    mime_type: string;
+    content_type?: string;
   }): Promise<UploadUrlResponse> => {
     const res = await apiClient.post('/videos/upload-url', data);
     return res.data;
   },
-  completeUpload: async (videoId: string): Promise<{ video: Video }> => {
+  completeUpload: async (videoId: string): Promise<Video> => {
     const res = await apiClient.post(`/videos/${videoId}/complete-upload`);
     return res.data;
   },
   uploadToS3: async (uploadUrl: string, file: File, onProgress?: (percent: number) => void): Promise<void> => {
-    await axios.put(uploadUrl, file, {
+    // If uploadUrl starts with /api or is relative, send to backend proxy
+    const targetUrl = uploadUrl.startsWith('http') ? uploadUrl : uploadUrl;
+
+    await axios.put(targetUrl, file, {
       headers: {
-        'Content-Type': file.type,
+        'Content-Type': file.type || 'video/mp4',
       },
       onUploadProgress: (progressEvent) => {
         if (progressEvent.total && onProgress) {
@@ -112,15 +113,15 @@ export const api = {
   },
 
   // Transcription Jobs
-  startTranscription: async (videoId: string): Promise<{ job: Job }> => {
-    const res = await apiClient.post(`/videos/${videoId}/transcribe`);
+  startTranscription: async (videoId: string, language: string = 'en-US'): Promise<Job> => {
+    const res = await apiClient.post(`/videos/${videoId}/transcribe`, { language });
     return res.data;
   },
-  getJobStatus: async (videoId: string): Promise<{ job: Job }> => {
+  getJobStatus: async (videoId: string): Promise<Job> => {
     const res = await apiClient.get(`/videos/${videoId}/transcription/status`);
     return res.data;
   },
-  getTranscription: async (videoId: string): Promise<{ transcript: Transcript; segments: TranscriptSegment[] }> => {
+  getTranscription: async (videoId: string): Promise<Transcript> => {
     const res = await apiClient.get(`/videos/${videoId}/transcription`);
     return res.data;
   },

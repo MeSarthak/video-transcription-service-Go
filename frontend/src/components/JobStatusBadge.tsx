@@ -1,9 +1,9 @@
 import React from 'react';
 import { Chip } from '@heroui/react';
-import { CheckCircle2, Clock, AlertTriangle, Loader2 } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, Loader2, UploadCloud } from 'lucide-react';
 
 interface JobStatusBadgeProps {
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'uploaded' | 'ready';
+  status: string;
   size?: 'sm' | 'md' | 'lg';
 }
 
@@ -19,7 +19,7 @@ export const JobStatusBadge: React.FC<JobStatusBadgeProps> = ({ status, size = '
           startContent={<CheckCircle2 className="w-3.5 h-3.5 text-success ml-1" />}
           className="capitalize font-medium"
         >
-          {status}
+          Completed
         </Chip>
       );
     case 'processing':
@@ -34,8 +34,9 @@ export const JobStatusBadge: React.FC<JobStatusBadgeProps> = ({ status, size = '
           Processing
         </Chip>
       );
-    case 'pending':
+    case 'queued':
     case 'uploaded':
+    case 'pending':
       return (
         <Chip
           color="warning"
@@ -44,7 +45,19 @@ export const JobStatusBadge: React.FC<JobStatusBadgeProps> = ({ status, size = '
           startContent={<Clock className="w-3.5 h-3.5 text-warning ml-1" />}
           className="capitalize font-medium"
         >
-          {status}
+          {status === 'queued' ? 'Queued' : 'Uploaded'}
+        </Chip>
+      );
+    case 'uploading':
+      return (
+        <Chip
+          color="primary"
+          variant="flat"
+          size={size}
+          startContent={<UploadCloud className="w-3.5 h-3.5 text-primary ml-1" />}
+          className="capitalize font-medium"
+        >
+          Uploading
         </Chip>
       );
     case 'failed':

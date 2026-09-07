@@ -19,6 +19,7 @@ type Repository interface {
 	Create(ctx context.Context, job *Job) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Job, error)
 	GetLatestByVideoID(ctx context.Context, videoID, userID uuid.UUID) (*Job, error)
+	GetNextQueuedJob(ctx context.Context) (*Job, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string, errorMsg *string) error
 	UpdateHeartbeat(ctx context.Context, id uuid.UUID) error
 	IncrementAttempts(ctx context.Context, id uuid.UUID) error
@@ -136,6 +137,42 @@ func (r *pgRepository) GetLatestByVideoID(ctx context.Context, videoID, userID u
 			return nil, ErrJobNotFound
 		}
 		return nil, fmt.Errorf("failed to get latest job for video: %w", err)
+	}
+
+	return &job, nil
+}
+
+func (r *pgRepository) GetNextQueuedJob(ctx context.Context) (*Job, error) {
+	query := `
+		SELECT id, video_id, user_id, status, provider, language, error_message, attempts, last_heartbeat_at, started_at, completed_at, created_at, updated_at
+		FROM transcription_jobs
+		WHERE status = 'queued'
+		ORDER BY created_at ASC
+		LIMIT 1
+	`
+
+	var job Job
+	err := r.pool.QueryRow(ctx, query).Scan(
+		&job.ID,
+		&job.VideoID,
+		&job.UserID,
+		&job.Status,
+		&job.Provider,
+		&job.Language,
+		&job.ErrorMessage,
+		&job.Attempts,
+		&job.LastHeartbeatAt,
+		&job.StartedAt,
+		&job.CompletedAt,
+		&job.CreatedAt,
+		&job.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrJobNotFound
+		}
+		return nil, err
 	}
 
 	return &job, nil

@@ -132,6 +132,10 @@ func main() {
 			c.JSON(http.StatusOK, gin.H{"message": "pong"})
 		})
 
+		// Local / Mock Storage Endpoints (Upload & Playback)
+		storageHandler := storage.NewHandler(storageService)
+		storageHandler.RegisterRoutes(v1)
+
 		if db != nil {
 			// Auth Module
 			userRepo := users.NewRepository(db.Pool)

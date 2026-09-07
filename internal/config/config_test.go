@@ -50,3 +50,31 @@ func TestConfigCustomEnv(t *testing.T) {
 		t.Errorf("expected IsProduction() to be true")
 	}
 }
+
+func TestConfigDBHostConstruction(t *testing.T) {
+	os.Unsetenv("DATABASE_URL")
+	os.Setenv("DB_HOST", "postgres-cluster")
+	os.Setenv("DB_PORT", "5433")
+	os.Setenv("DB_USER", "custom_user")
+	os.Setenv("DB_PASSWORD", "custom_pass")
+	os.Setenv("DB_NAME", "custom_db")
+	os.Setenv("DB_SSLMODE", "require")
+	defer func() {
+		os.Unsetenv("DB_HOST")
+		os.Unsetenv("DB_PORT")
+		os.Unsetenv("DB_USER")
+		os.Unsetenv("DB_PASSWORD")
+		os.Unsetenv("DB_NAME")
+		os.Unsetenv("DB_SSLMODE")
+	}()
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("expected no error loading config, got %v", err)
+	}
+
+	expectedURL := "postgres://custom_user:custom_pass@postgres-cluster:5433/custom_db?sslmode=require"
+	if cfg.DatabaseURL != expectedURL {
+		t.Errorf("expected DatabaseURL %s, got %s", expectedURL, cfg.DatabaseURL)
+	}
+}

@@ -45,6 +45,15 @@ func (m *mockJobRepo) GetLatestByVideoID(ctx context.Context, videoID, userID uu
 	return nil, ErrJobNotFound
 }
 
+func (m *mockJobRepo) GetNextQueuedJob(ctx context.Context) (*Job, error) {
+	for _, j := range m.jobs {
+		if j.Status == StatusQueued {
+			return j, nil
+		}
+	}
+	return nil, ErrJobNotFound
+}
+
 func (m *mockJobRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status string, errorMsg *string) error {
 	j, exists := m.jobs[id]
 	if !exists {

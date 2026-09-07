@@ -43,25 +43,25 @@ export const VideoDetailPage: React.FC = () => {
     if (!id) return;
     try {
       setError(null);
-      const videoRes = await api.getVideo(id);
-      setVideo(videoRes.video);
+      const videoData = await api.getVideo(id);
+      setVideo(videoData);
 
       // Check job status
       try {
-        const jobRes = await api.getJobStatus(id);
-        setJob(jobRes.job);
+        const jobData = await api.getJobStatus(id);
+        setJob(jobData);
       } catch {
         // Job might not exist yet
       }
 
       // Check transcript if ready
-      if (videoRes.video.status === 'ready') {
+      if (videoData.status === 'completed') {
         try {
-          const transRes = await api.getTranscription(id);
-          setTranscript(transRes.transcript);
-          setSegments(transRes.segments || transRes.transcript?.segments || []);
+          const transData = await api.getTranscription(id);
+          setTranscript(transData);
+          setSegments(transData.segments || []);
         } catch {
-          // Transcript not yet available
+          // Transcript not yet ready
         }
       }
     } catch (err: unknown) {
@@ -78,13 +78,13 @@ export const VideoDetailPage: React.FC = () => {
     const interval = setInterval(() => {
       if (
         video?.status === 'processing' ||
-        video?.status === 'pending' ||
+        video?.status === 'uploading' ||
         job?.status === 'processing' ||
-        job?.status === 'pending'
+        job?.status === 'queued'
       ) {
         loadData();
       }
-    }, 3500);
+    }, 2500);
 
     return () => clearInterval(interval);
   }, [loadData, video?.status, job?.status]);
@@ -93,8 +93,8 @@ export const VideoDetailPage: React.FC = () => {
     if (!id) return;
     setActionLoading(true);
     try {
-      const res = await api.startTranscription(id);
-      setJob(res.job);
+      const jobData = await api.startTranscription(id);
+      setJob(jobData);
       if (video) {
         setVideo({ ...video, status: 'processing' });
       }
@@ -153,11 +153,11 @@ export const VideoDetailPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate max-w-lg">
-                {video.title}
+                {video.filename}
               </h1>
               <JobStatusBadge status={video.status} />
             </div>
-            <p className="text-xs text-default-400 mt-0.5 truncate">{video.original_filename}</p>
+            <p className="text-xs text-default-400 mt-0.5 font-mono">{video.storage_key}</p>
           </div>
         </div>
 
@@ -171,7 +171,7 @@ export const VideoDetailPage: React.FC = () => {
             Refresh
           </Button>
 
-          {video.status === 'uploaded' && (
+          {(video.status === 'uploaded' || video.status === 'failed') && (
             <Button
               size="sm"
               color="primary"
@@ -185,7 +185,7 @@ export const VideoDetailPage: React.FC = () => {
 
           <ExportDropdown
             videoId={video.id}
-            videoTitle={video.title}
+            videoTitle={video.filename}
             disabled={segments.length === 0}
           />
         </div>
@@ -210,9 +210,9 @@ export const VideoDetailPage: React.FC = () => {
                 <span className="text-xs font-semibold uppercase tracking-wider text-default-400">
                   Media Properties
                 </span>
-                {transcript?.provider && (
+                {job?.provider && (
                   <Chip size="sm" variant="flat" color="secondary" className="text-xs font-medium">
-                    Provider: {transcript.provider}
+                    Engine: {job.provider}
                   </Chip>
                 )}
               </div>
@@ -223,7 +223,9 @@ export const VideoDetailPage: React.FC = () => {
                     <Clock className="w-3 h-3" /> Duration
                   </span>
                   <span className="font-semibold text-foreground">
-                    {video.duration_seconds > 0 ? `${video.duration_seconds.toFixed(1)}s` : 'Unknown'}
+                    {video.duration_seconds && video.duration_seconds > 0
+                      ? `${video.duration_seconds.toFixed(1)}s`
+                      : 'Calculated in worker'}
                   </span>
                 </div>
 
@@ -232,7 +234,7 @@ export const VideoDetailPage: React.FC = () => {
                     <HardDrive className="w-3 h-3" /> File Size
                   </span>
                   <span className="font-semibold text-foreground">
-                    {(video.file_size_bytes / (1024 * 1024)).toFixed(2)} MB
+                    {(video.size_bytes / (1024 * 1024)).toFixed(2)} MB
                   </span>
                 </div>
 
@@ -241,16 +243,16 @@ export const VideoDetailPage: React.FC = () => {
                     <Sparkles className="w-3 h-3" /> Language
                   </span>
                   <span className="font-semibold text-foreground">
-                    {transcript?.language_code || 'en-US'}
+                    {transcript?.language || job?.language || 'en-US'}
                   </span>
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-default-50 dark:bg-default-100/30">
                   <span className="text-default-400 flex items-center gap-1 mb-1">
-                    <FileCode className="w-3 h-3" /> S3 Key
+                    <FileCode className="w-3 h-3" /> Content-Type
                   </span>
-                  <span className="font-semibold text-foreground truncate block" title={video.s3_key}>
-                    {video.s3_key.slice(0, 10)}...
+                  <span className="font-semibold text-foreground truncate block">
+                    {video.content_type || 'video/mp4'}
                   </span>
                 </div>
               </div>
@@ -282,15 +284,15 @@ export const VideoDetailPage: React.FC = () => {
           <Accordion variant="bordered">
             <AccordionItem
               key="json-inspector"
-              aria-label="Raw AWS Transcribe JSON & Segments Data"
+              aria-label="Raw Transcription Model Inspector"
               title={
                 <span className="text-xs font-semibold text-default-500 uppercase tracking-wider flex items-center gap-2">
-                  <FileCode className="w-4 h-4" /> Raw Output Inspection & JSON Model
+                  <FileCode className="w-4 h-4" /> Raw Output & JSON Segments Model
                 </span>
               }
             >
               <pre className="p-4 rounded-xl bg-default-900 text-default-100 text-xs overflow-x-auto max-h-72 font-mono">
-                {JSON.stringify({ video, transcript, segments }, null, 2)}
+                {JSON.stringify({ video, job, transcript }, null, 2)}
               </pre>
             </AccordionItem>
           </Accordion>

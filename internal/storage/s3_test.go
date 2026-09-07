@@ -40,12 +40,12 @@ func TestMockStorageService(t *testing.T) {
 
 	// 3. Presigned URLs
 	putURL, err := svc.GeneratePresignedPutURL(ctx, key, "video/mp4", 15*time.Minute)
-	if err != nil || !strings.Contains(putURL, key) {
+	if err != nil || !strings.Contains(putURL, "upload") {
 		t.Errorf("invalid presigned put url: %v", putURL)
 	}
 
 	getURL, err := svc.GeneratePresignedGetURL(ctx, key, 15*time.Minute)
-	if err != nil || !strings.Contains(getURL, key) {
+	if err != nil || !strings.Contains(getURL, "playback") {
 		t.Errorf("invalid presigned get url: %v", getURL)
 	}
 

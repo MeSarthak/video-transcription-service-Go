@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"strconv"
@@ -39,21 +40,39 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	// Load .env file if present, ignore if not found (e.g. production/ECS)
+	// Load .env file if present, ignore if not found (e.g. production/ECS/Docker)
 	if err := godotenv.Load(); err != nil {
 		if !os.IsNotExist(err) {
 			slog.Debug("No .env file found, using system environment variables")
 		}
 	}
 
+	// Resolve database URL:
+	// 1. Explicit DATABASE_URL
+	// 2. Constructed from DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, DB_SSLMODE
+	// 3. Default localhost connection string
+	dbURL := getEnv("DATABASE_URL", "")
+	if dbURL == "" {
+		if dbHost := getEnv("DB_HOST", ""); dbHost != "" {
+			dbUser := getEnv("DB_USER", "postgres")
+			dbPass := getEnv("DB_PASSWORD", "postgres")
+			dbPort := getEnv("DB_PORT", "5432")
+			dbName := getEnv("DB_NAME", "transcription_db")
+			dbSSL := getEnv("DB_SSLMODE", "disable")
+			dbURL = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", dbUser, dbPass, dbHost, dbPort, dbName, dbSSL)
+		} else {
+			dbURL = "postgres://postgres:postgres@localhost:5432/transcription_db?sslmode=disable"
+		}
+	}
+
 	cfg := &Config{
-		Port:             getEnv("PORT", "8080"),
-		Env:              getEnv("ENV", "development"),
+		Port:             getEnvWithFallback("PORT", "SERVER_PORT", "8080"),
+		Env:              getEnvWithFallback("ENV", "SERVER_ENV", "development"),
 		LogLevel:         getEnv("LOG_LEVEL", "info"),
 		ReadTimeout:      getEnvDuration("READ_TIMEOUT", 15*time.Second),
 		WriteTimeout:     getEnvDuration("WRITE_TIMEOUT", 15*time.Second),
 		AllowedOrigins:   getEnvSlice("CORS_ALLOWED_ORIGINS", []string{"http://localhost:5173", "http://localhost:3000"}),
-		DatabaseURL:      getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/transcription_db?sslmode=disable"),
+		DatabaseURL:      dbURL,
 		DBMaxOpenConns:   getEnvInt("DB_MAX_OPEN_CONNS", 25),
 		DBMaxIdleConns:   getEnvInt("DB_MAX_IDLE_CONNS", 10),
 		DBMaxIdleTime:    getEnvDuration("DB_MAX_IDLE_TIME", 15*time.Minute),
@@ -74,6 +93,16 @@ func (c *Config) IsProduction() bool {
 
 func getEnv(key, defaultVal string) string {
 	if val, exists := os.LookupEnv(key); exists && val != "" {
+		return val
+	}
+	return defaultVal
+}
+
+func getEnvWithFallback(primaryKey, fallbackKey, defaultVal string) string {
+	if val, exists := os.LookupEnv(primaryKey); exists && val != "" {
+		return val
+	}
+	if val, exists := os.LookupEnv(fallbackKey); exists && val != "" {
 		return val
 	}
 	return defaultVal

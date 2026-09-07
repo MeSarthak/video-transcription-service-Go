@@ -4,48 +4,73 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"net/url"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
 
-// MockStorage is an in-memory implementation of storage.Service for tests and local emulation.
+// MockStorage is a disk-backed and in-memory implementation of storage.Service for tests and local emulation.
 type MockStorage struct {
 	mu      sync.RWMutex
+	baseDir string
 	Objects map[string][]byte
 	Meta    map[string]*ObjectMetadata
 }
 
 func NewMockStorage() *MockStorage {
+	baseDir := filepath.Join(os.TempDir(), "transcription_storage")
+	_ = os.MkdirAll(baseDir, 0755)
+
 	return &MockStorage{
+		baseDir: baseDir,
 		Objects: make(map[string][]byte),
 		Meta:    make(map[string]*ObjectMetadata),
 	}
+}
+
+func (m *MockStorage) filePath(key string) string {
+	return filepath.Join(m.baseDir, filepath.FromSlash(key))
 }
 
 func (m *MockStorage) GeneratePresignedPutURL(ctx context.Context, key, contentType string, expiry time.Duration) (string, error) {
 	if key == "" {
 		return "", ErrStorageOpFailed
 	}
-	return "https://mock-s3.amazonaws.com/test-bucket/" + key + "?signed=true", nil
+	return "/api/v1/storage/upload?key=" + url.QueryEscape(key), nil
 }
 
 func (m *MockStorage) GeneratePresignedGetURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
 	if key == "" {
 		return "", ErrStorageOpFailed
 	}
-	return "https://mock-s3.amazonaws.com/test-bucket/" + key + "?playback=true", nil
+	return "/api/v1/storage/playback?key=" + url.QueryEscape(key), nil
 }
 
 func (m *MockStorage) HeadObject(ctx context.Context, key string) (*ObjectMetadata, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	data, exists := m.Objects[key]
-	if !exists {
-		return nil, ErrObjectNotFound
+	// Check in-memory metadata
+	if meta, exists := m.Meta[key]; exists {
+		return meta, nil
 	}
-	meta, exists := m.Meta[key]
-	if !exists {
+
+	// Check disk
+	fp := m.filePath(key)
+	fi, err := os.Stat(fp)
+	if err == nil {
+		return &ObjectMetadata{
+			Key:          key,
+			SizeBytes:    fi.Size(),
+			ContentType:  "video/mp4",
+			LastModified: fi.ModTime(),
+		}, nil
+	}
+
+	// Check in-memory byte slice
+	if data, exists := m.Objects[key]; exists {
 		return &ObjectMetadata{
 			Key:          key,
 			SizeBytes:    int64(len(data)),
@@ -53,7 +78,8 @@ func (m *MockStorage) HeadObject(ctx context.Context, key string) (*ObjectMetada
 			LastModified: time.Now(),
 		}, nil
 	}
-	return meta, nil
+
+	return nil, ErrObjectNotFound
 }
 
 func (m *MockStorage) DeleteObject(ctx context.Context, key string) error {
@@ -62,6 +88,7 @@ func (m *MockStorage) DeleteObject(ctx context.Context, key string) error {
 
 	delete(m.Objects, key)
 	delete(m.Meta, key)
+	_ = os.Remove(m.filePath(key))
 	return nil
 }
 
@@ -81,6 +108,12 @@ func (m *MockStorage) Upload(ctx context.Context, key string, body io.Reader, co
 		ContentType:  contentType,
 		LastModified: time.Now(),
 	}
+
+	// Also persist to disk for worker process sharing
+	fp := m.filePath(key)
+	_ = os.MkdirAll(filepath.Dir(fp), 0755)
+	_ = os.WriteFile(fp, data, 0644)
+
 	return nil
 }
 
@@ -88,9 +121,17 @@ func (m *MockStorage) GetObject(ctx context.Context, key string) (io.ReadCloser,
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	data, exists := m.Objects[key]
-	if !exists {
-		return nil, ErrObjectNotFound
+	// Check in-memory
+	if data, exists := m.Objects[key]; exists {
+		return io.NopCloser(bytes.NewReader(data)), nil
 	}
-	return io.NopCloser(bytes.NewReader(data)), nil
+
+	// Check disk
+	fp := m.filePath(key)
+	f, err := os.Open(fp)
+	if err == nil {
+		return f, nil
+	}
+
+	return nil, ErrObjectNotFound
 }

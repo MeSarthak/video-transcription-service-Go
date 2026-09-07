@@ -57,24 +57,40 @@ func (w *Worker) Start(ctx context.Context) error {
 			slog.Info("Worker context canceled, stopping polling loop")
 			return ctx.Err()
 		default:
-			// Poll SQS with 20 second long polling
-			messages, err := w.queue.Receive(ctx, 1, 20)
-			if err != nil {
-				if errors.Is(err, context.Canceled) {
-					return nil
-				}
+			// 1. Poll SQS with long polling
+			messages, err := w.queue.Receive(ctx, 1, 5)
+			if err != nil && !errors.Is(err, context.Canceled) {
 				slog.Error("Failed to receive messages from queue", slog.Any("error", err))
-				time.Sleep(w.pollInterval)
+			}
+
+			if len(messages) > 0 {
+				for _, msg := range messages {
+					w.processMessage(ctx, msg)
+				}
 				continue
 			}
 
-			if len(messages) == 0 {
+			// 2. Fallback check for local development: check PostgreSQL directly for queued jobs
+			nextJob, err := w.jobRepo.GetNextQueuedJob(ctx)
+			if err == nil && nextJob != nil {
+				slog.Info("Found queued job in database (local queue dispatch)", slog.String("job_id", nextJob.ID.String()))
+				syntheticMsg := &queue.ReceivedMessage{
+					Message: &queue.TranscriptionMessage{
+						JobID:    nextJob.ID,
+						VideoID:  nextJob.VideoID,
+						UserID:   nextJob.UserID,
+						Language: nextJob.Language,
+						Attempt:  nextJob.Attempts + 1,
+					},
+					ReceiptHandle:           fmt.Sprintf("db-job-%s", nextJob.ID.String()),
+					ApproximateReceiveCount: nextJob.Attempts + 1,
+				}
+				w.processMessage(ctx, syntheticMsg)
 				continue
 			}
 
-			for _, msg := range messages {
-				w.processMessage(ctx, msg)
-			}
+			// Idle sleep before next poll
+			time.Sleep(w.pollInterval)
 		}
 	}
 }
@@ -86,7 +102,7 @@ func (w *Worker) processMessage(ctx context.Context, received *queue.ReceivedMes
 	slog.Info("Processing transcription job",
 		slog.String("job_id", msg.JobID.String()),
 		slog.String("video_id", msg.VideoID.String()),
-		slog.Int("sqs_attempt", received.ApproximateReceiveCount),
+		slog.Int("attempt", received.ApproximateReceiveCount),
 	)
 
 	// 1. Idempotency check: verify job status in DB
@@ -118,6 +134,7 @@ func (w *Worker) processMessage(ctx context.Context, received *queue.ReceivedMes
 	// 3. Mark job as processing & increment attempts
 	_ = w.jobRepo.IncrementAttempts(ctx, msg.JobID)
 	_ = w.jobRepo.UpdateStatus(ctx, msg.JobID, jobs.StatusProcessing, nil)
+	_ = w.videoRepo.UpdateStatusAndMetadata(ctx, msg.VideoID, msg.UserID, videos.StatusProcessing, 0, "")
 
 	// 4. Start Background Heartbeat & Visibility Timeout Goroutine
 	stopHeartbeat := make(chan struct{})
@@ -172,6 +189,6 @@ func (w *Worker) processMessage(ctx context.Context, received *queue.ReceivedMes
 	if err := w.queue.Delete(ctx, receiptHandle); err != nil {
 		slog.Warn("Failed to delete completed SQS message", slog.Any("error", err))
 	} else {
-		slog.Info("Job processed and SQS message acknowledged successfully", slog.String("job_id", msg.JobID.String()))
+		slog.Info("Job processed and acknowledged successfully", slog.String("job_id", msg.JobID.String()))
 	}
 }

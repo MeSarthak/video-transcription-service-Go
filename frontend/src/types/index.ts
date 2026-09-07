@@ -8,14 +8,12 @@ export interface User {
 export interface Video {
   id: string;
   user_id: string;
-  title: string;
-  original_filename: string;
-  s3_key: string;
-  s3_bucket: string;
-  duration_seconds: number;
-  file_size_bytes: number;
-  mime_type: string;
-  status: 'pending' | 'uploaded' | 'processing' | 'ready' | 'failed';
+  filename: string;
+  storage_key: string;
+  content_type: string;
+  size_bytes: number;
+  duration_seconds?: number;
+  status: 'uploading' | 'uploaded' | 'processing' | 'completed' | 'failed' | 'deleted';
   playback_url?: string;
   created_at: string;
   updated_at: string;
@@ -25,10 +23,12 @@ export interface Job {
   id: string;
   video_id: string;
   user_id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  retry_count: number;
-  max_retries: number;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  provider: string;
+  language: string;
   error_message?: string;
+  attempts: number;
+  last_heartbeat_at?: string;
   started_at?: string;
   completed_at?: string;
   created_at: string;
@@ -36,27 +36,20 @@ export interface Job {
 }
 
 export interface TranscriptSegment {
-  id: string;
-  transcript_id: string;
-  segment_index: number;
+  sequence_number: number;
   start_time: number;
   end_time: number;
   text: string;
   confidence: number;
-  created_at: string;
 }
 
 export interface Transcript {
   id: string;
   video_id: string;
-  job_id: string;
-  language_code: string;
+  language: string;
   full_text: string;
-  duration_seconds: number;
-  provider: string;
-  segments?: TranscriptSegment[];
+  segments: TranscriptSegment[];
   created_at: string;
-  updated_at: string;
 }
 
 export interface AuthTokens {
@@ -67,15 +60,8 @@ export interface AuthTokens {
 }
 
 export interface UploadUrlResponse {
-  upload_url: string;
-  s3_key: string;
-  expires_in: number;
   video_id: string;
-}
-
-export interface VideoDetailResponse {
-  video: Video;
-  job?: Job;
-  transcript?: Transcript;
-  segments?: TranscriptSegment[];
+  storage_key: string;
+  upload_url: string;
+  expires_in: number;
 }

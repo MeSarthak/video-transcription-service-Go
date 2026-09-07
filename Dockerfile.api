@@ -22,7 +22,6 @@ RUN apk add --no-cache ca-certificates tzdata
 
 COPY --from=builder /app/bin/api /app/bin/api
 COPY --from=builder /app/migrations /app/migrations
-COPY .env.example /app/.env
 
 EXPOSE 8080
 

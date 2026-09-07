@@ -119,7 +119,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
 
             return (
               <div
-                key={segment.id || segment.segment_index}
+                key={segment.sequence_number}
                 ref={isActive ? activeSegmentRef : null}
                 onClick={() => onSeek(segment.start_time)}
                 className={`p-3 rounded-xl cursor-pointer transition-all duration-150 border ${

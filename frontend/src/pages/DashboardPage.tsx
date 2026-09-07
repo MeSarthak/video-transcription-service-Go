@@ -51,15 +51,18 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     fetchVideos();
-    // Poll every 5s if any video is processing
+    // Poll every 3s if any video is processing or queued
     const interval = setInterval(() => {
       const hasActive = videos.some(
-        (v) => v.status === 'processing' || v.status === 'pending' || v.status === 'uploaded'
+        (v) =>
+          v.status === 'processing' ||
+          v.status === 'uploading' ||
+          v.status === 'uploaded'
       );
       if (hasActive) {
         fetchVideos();
       }
-    }, 4000);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [fetchVideos, videos]);
@@ -79,8 +82,7 @@ export const DashboardPage: React.FC = () => {
   };
 
   const filteredVideos = videos.filter((v) =>
-    v.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    v.original_filename.toLowerCase().includes(searchQuery.toLowerCase())
+    v.filename.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const formatFileSize = (bytes: number) => {
@@ -88,7 +90,7 @@ export const DashboardPage: React.FC = () => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const formatDuration = (secs: number) => {
+  const formatDuration = (secs?: number) => {
     if (!secs) return '--:--';
     const m = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
@@ -107,7 +109,7 @@ export const DashboardPage: React.FC = () => {
             </span>
           </h1>
           <p className="text-sm text-default-500 mt-1">
-            Distributed asynchronous pipeline powered by Go, SQS workers, FFmpeg & AWS Transcribe.
+            Asynchronous media pipeline with FFmpeg normalization, Speech-to-Text & Subtitle sync.
           </p>
         </div>
 
@@ -154,7 +156,7 @@ export const DashboardPage: React.FC = () => {
             <div>
               <p className="text-xs text-default-400 font-medium">Active Processing</p>
               <h3 className="text-2xl font-bold">
-                {videos.filter((v) => v.status === 'processing' || v.status === 'pending').length}
+                {videos.filter((v) => v.status === 'processing' || v.status === 'uploading' || v.status === 'uploaded').length}
               </h3>
             </div>
           </CardBody>
@@ -166,9 +168,9 @@ export const DashboardPage: React.FC = () => {
               <Sparkles className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-default-400 font-medium">Ready & Transcribed</p>
+              <p className="text-xs text-default-400 font-medium">Completed</p>
               <h3 className="text-2xl font-bold">
-                {videos.filter((v) => v.status === 'ready').length}
+                {videos.filter((v) => v.status === 'completed').length}
               </h3>
             </div>
           </CardBody>
@@ -178,7 +180,7 @@ export const DashboardPage: React.FC = () => {
       {/* Search & Filter Toolbar */}
       <div className="flex items-center justify-between gap-4">
         <Input
-          placeholder="Search by video title or filename..."
+          placeholder="Search by video filename..."
           value={searchQuery}
           onValueChange={setSearchQuery}
           startContent={<Search className="w-4 h-4 text-default-400" />}
@@ -201,11 +203,11 @@ export const DashboardPage: React.FC = () => {
             <VideoIcon className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-foreground">No videos found</h3>
+            <h3 className="text-lg font-bold text-foreground">No videos yet</h3>
             <p className="text-xs text-default-400 max-w-sm mx-auto mt-1">
               {searchQuery
                 ? 'No videos match your search query.'
-                : 'Upload your first video to start automated transcription and subtitle extraction.'}
+                : 'Upload your first video to extract audio and generate synchronized transcripts.'}
             </p>
           </div>
           <Button
@@ -227,14 +229,10 @@ export const DashboardPage: React.FC = () => {
               <CardBody className="p-5 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <h4 className="font-bold text-base text-foreground line-clamp-1 group-hover:text-primary transition-colors">
-                    {video.title}
+                    {video.filename}
                   </h4>
                   <JobStatusBadge status={video.status} />
                 </div>
-
-                <p className="text-xs text-default-400 line-clamp-1">
-                  {video.original_filename}
-                </p>
 
                 <div className="flex items-center gap-4 text-xs text-default-500 pt-2 border-t border-default-100 dark:border-default-800/60">
                   <span className="flex items-center gap-1">
@@ -243,7 +241,7 @@ export const DashboardPage: React.FC = () => {
                   </span>
                   <span className="flex items-center gap-1">
                     <HardDrive className="w-3.5 h-3.5 text-default-400" />
-                    {formatFileSize(video.file_size_bytes)}
+                    {formatFileSize(video.size_bytes)}
                   </span>
                 </div>
               </CardBody>
@@ -258,7 +256,7 @@ export const DashboardPage: React.FC = () => {
                   startContent={<Play className="w-3.5 h-3.5" />}
                   className="font-medium"
                 >
-                  View Details & Captions
+                  View Captions
                 </Button>
 
                 <Button
@@ -288,7 +286,7 @@ export const DashboardPage: React.FC = () => {
           <ModalHeader>Confirm Deletion</ModalHeader>
           <ModalBody>
             <p className="text-sm text-default-600">
-              Are you sure you want to permanently delete this video, its S3 storage object, and all associated transcripts and segments?
+              Are you sure you want to permanently delete this video, storage objects, and all generated transcripts?
             </p>
           </ModalBody>
           <ModalFooter>
