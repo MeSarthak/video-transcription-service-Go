@@ -21,6 +21,7 @@ import (
 	"video-transcription-service/internal/middleware"
 	"video-transcription-service/internal/queue"
 	"video-transcription-service/internal/storage"
+	"video-transcription-service/internal/transcription"
 	"video-transcription-service/internal/users"
 	"video-transcription-service/internal/videos"
 	"video-transcription-service/pkg/logger"
@@ -144,11 +145,17 @@ func main() {
 			videoHandler := videos.NewHandler(videoService)
 			videoHandler.RegisterRoutes(v1, authMiddleware)
 
-			// Jobs / Transcription Module
+			// Jobs / Transcription Queue Trigger Module
 			jobRepo := jobs.NewRepository(db.Pool)
 			jobService := jobs.NewService(jobRepo, videoRepo, jobQueue)
 			jobHandler := jobs.NewHandler(jobService)
 			jobHandler.RegisterRoutes(v1, authMiddleware)
+
+			// Transcript Retrieval & Export Module
+			transcriptRepo := transcription.NewRepository(db.Pool)
+			transcriptService := transcription.NewService(transcriptRepo, videoRepo)
+			transcriptHandler := transcription.NewHandler(transcriptService)
+			transcriptHandler.RegisterRoutes(v1, authMiddleware)
 		}
 	}
 
