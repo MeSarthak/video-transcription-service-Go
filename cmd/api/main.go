@@ -17,7 +17,9 @@ import (
 	"video-transcription-service/internal/config"
 	"video-transcription-service/internal/database"
 	"video-transcription-service/internal/health"
+	"video-transcription-service/internal/jobs"
 	"video-transcription-service/internal/middleware"
+	"video-transcription-service/internal/queue"
 	"video-transcription-service/internal/storage"
 	"video-transcription-service/internal/users"
 	"video-transcription-service/internal/videos"
@@ -79,20 +81,35 @@ func main() {
 		storageService = s3Store
 	}
 
-	// 5. Set Gin mode
+	// 5. Initialize SQS Queue Service
+	var jobQueue queue.Queue
+	sqsQueue, err := queue.NewSQSQueue(ctx, cfg.AWSRegion, cfg.SQSQueueURL)
+	if err != nil {
+		if cfg.IsProduction() {
+			slog.Error("AWS SQS initialization failed in production", slog.Any("error", err))
+			os.Exit(1)
+		} else {
+			slog.Warn("AWS SQS initialization warning (using mock queue for local dev)", slog.Any("error", err))
+			jobQueue = queue.NewMockQueue()
+		}
+	} else {
+		jobQueue = sqsQueue
+	}
+
+	// 6. Set Gin mode
 	if cfg.IsProduction() {
 		gin.SetMode(gin.ReleaseMode)
 	} else {
 		gin.SetMode(gin.DebugMode)
 	}
 
-	// 6. Setup Router & Global Middleware
+	// 7. Setup Router & Global Middleware
 	router := gin.New()
 	router.Use(middleware.Recovery())
 	router.Use(middleware.RequestLogger())
 	router.Use(middleware.CORS(cfg.AllowedOrigins))
 
-	// 7. Register Health & Readiness Checkers
+	// 8. Register Health & Readiness Checkers
 	checkers := make(map[string]health.Checker)
 	if db != nil {
 		checkers["database"] = db.Ping
@@ -105,7 +122,7 @@ func main() {
 	healthHandler := health.NewHandler(checkers)
 	healthHandler.RegisterRoutes(router)
 
-	// 8. Initialize Repositories, Services, and Handlers
+	// 9. Initialize Repositories, Services, and Handlers
 	authMiddleware := middleware.Auth(cfg.JWTSecret)
 
 	v1 := router.Group("/api/v1")
@@ -126,10 +143,16 @@ func main() {
 			videoService := videos.NewService(videoRepo, storageService)
 			videoHandler := videos.NewHandler(videoService)
 			videoHandler.RegisterRoutes(v1, authMiddleware)
+
+			// Jobs / Transcription Module
+			jobRepo := jobs.NewRepository(db.Pool)
+			jobService := jobs.NewService(jobRepo, videoRepo, jobQueue)
+			jobHandler := jobs.NewHandler(jobService)
+			jobHandler.RegisterRoutes(v1, authMiddleware)
 		}
 	}
 
-	// 9. Setup HTTP Server
+	// 10. Setup HTTP Server
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      router,
@@ -138,7 +161,7 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// 10. Start server in a background goroutine
+	// 11. Start server in a background goroutine
 	go func() {
 		slog.Info("HTTP server listening", slog.String("addr", server.Addr))
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -147,7 +170,7 @@ func main() {
 		}
 	}()
 
-	// 11. Wait for interrupt signal for graceful shutdown
+	// 12. Wait for interrupt signal for graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	sig := <-quit
