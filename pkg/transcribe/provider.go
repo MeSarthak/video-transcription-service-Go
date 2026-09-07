@@ -36,11 +36,12 @@ type TranscriptionResult struct {
 }
 
 type TranscriptionInput struct {
-	JobID        string
-	MediaS3URI   string // e.g. s3://bucket/audio/user/video/audio.wav
-	OutputBucket string
-	OutputKey    string
-	LanguageCode string // e.g. "en-US"
+	JobID          string
+	MediaS3URI     string // e.g. s3://bucket/audio/user/video/audio.wav
+	OutputBucket   string
+	OutputKey      string
+	LanguageCode   string // e.g. "en-US"
+	LocalAudioPath string // local disk path to audio file (for Whisper / local providers)
 }
 
 // Provider defines the interface for speech-to-text service providers.

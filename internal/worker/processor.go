@@ -106,11 +106,12 @@ func (p *Processor) ProcessJob(ctx context.Context, msg *queue.TranscriptionMess
 	// 6. Call Transcription Provider (AWS Transcribe / Mock)
 	mediaS3URI := fmt.Sprintf("s3://%s/%s", p.bucket, audioStorageKey)
 	transcribeInput := transcribe.TranscriptionInput{
-		JobID:        msg.JobID.String(),
-		MediaS3URI:   mediaS3URI,
-		OutputBucket: p.bucket,
-		OutputKey:    fmt.Sprintf("transcripts/%s/%s/raw_output.json", msg.UserID.String(), msg.VideoID.String()),
-		LanguageCode: msg.Language,
+		JobID:          msg.JobID.String(),
+		MediaS3URI:     mediaS3URI,
+		OutputBucket:   p.bucket,
+		OutputKey:      fmt.Sprintf("transcripts/%s/%s/raw_output.json", msg.UserID.String(), msg.VideoID.String()),
+		LanguageCode:   msg.Language,
+		LocalAudioPath: localAudioPath,
 	}
 
 	result, err := p.provider.Transcribe(ctx, transcribeInput)
@@ -123,20 +124,22 @@ func (p *Processor) ProcessJob(ctx context.Context, msg *queue.TranscriptionMess
 	rawS3Key := transcribeInput.OutputKey
 
 	err = p.db.WithTx(ctx, func(tx pgx.Tx) error {
-		// Insert transcript
+		// Insert or update transcript, returning the actual ID in the table
+		var actualTranscriptID uuid.UUID
 		insertTranscriptSQL := `
 			INSERT INTO transcripts (id, video_id, job_id, language, full_text, raw_s3_key)
 			VALUES ($1, $2, $3, $4, $5, $6)
 			ON CONFLICT (video_id) DO UPDATE
 			SET job_id = $3, language = $4, full_text = $5, raw_s3_key = $6, updated_at = NOW()
+			RETURNING id
 		`
-		_, err := tx.Exec(ctx, insertTranscriptSQL, transcriptID, msg.VideoID, msg.JobID, result.Language, result.FullText, rawS3Key)
+		err := tx.QueryRow(ctx, insertTranscriptSQL, transcriptID, msg.VideoID, msg.JobID, result.Language, result.FullText, rawS3Key).Scan(&actualTranscriptID)
 		if err != nil {
 			return fmt.Errorf("failed to insert transcript: %w", err)
 		}
 
-		// Delete any existing segments for video
-		_, _ = tx.Exec(ctx, `DELETE FROM transcript_segments WHERE transcript_id = $1`, transcriptID)
+		// Delete any existing segments for this transcript
+		_, _ = tx.Exec(ctx, `DELETE FROM transcript_segments WHERE transcript_id = $1`, actualTranscriptID)
 
 		// Insert segments
 		insertSegmentSQL := `
@@ -146,7 +149,7 @@ func (p *Processor) ProcessJob(ctx context.Context, msg *queue.TranscriptionMess
 		for _, seg := range result.Segments {
 			_, err := tx.Exec(ctx, insertSegmentSQL,
 				uuid.New(),
-				transcriptID,
+				actualTranscriptID,
 				seg.SequenceNumber,
 				seg.StartTime,
 				seg.EndTime,

@@ -75,6 +75,10 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME:-transcription-service-videos}
       SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      WHISPER_API_URL: ${WHISPER_API_URL:-}
+      WHISPER_MODEL: ${WHISPER_MODEL:-}
     volumes:
       - shared_storage:/tmp/transcription_storage
 

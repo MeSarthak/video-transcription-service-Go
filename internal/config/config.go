@@ -37,6 +37,12 @@ type Config struct {
 	AWSRegion    string
 	S3BucketName string
 	SQSQueueURL  string
+
+	// Whisper Speech-to-Text (Groq or OpenAI)
+	OpenAIAPIKey  string
+	GroqAPIKey    string
+	WhisperAPIURL string
+	WhisperModel  string
 }
 
 func Load() (*Config, error) {
@@ -82,6 +88,10 @@ func Load() (*Config, error) {
 		AWSRegion:        getEnv("AWS_REGION", "us-east-1"),
 		S3BucketName:     getEnv("S3_BUCKET_NAME", "video-transcription-bucket"),
 		SQSQueueURL:      getEnv("SQS_QUEUE_URL", ""),
+		OpenAIAPIKey:     getEnv("OPENAI_API_KEY", ""),
+		GroqAPIKey:       getEnv("GROQ_API_KEY", ""),
+		WhisperAPIURL:    getEnv("WHISPER_API_URL", ""),
+		WhisperModel:     getEnv("WHISPER_MODEL", ""),
 	}
 
 	return cfg, nil
@@ -95,6 +105,10 @@ func (c *Config) HasAWSCredentials() bool {
 	accessKey := os.Getenv("AWS_ACCESS_KEY_ID")
 	secretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
 	return accessKey != "" && secretKey != ""
+}
+
+func (c *Config) HasWhisperKey() bool {
+	return c.GroqAPIKey != "" || c.OpenAIAPIKey != ""
 }
 
 func (c *Config) HasValidSQS() bool {
