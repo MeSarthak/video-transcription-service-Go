@@ -16,7 +16,9 @@ import (
 	"video-transcription-service/internal/storage"
 	"video-transcription-service/internal/videos"
 	"video-transcription-service/internal/worker"
+	"video-transcription-service/pkg/ffmpeg"
 	"video-transcription-service/pkg/logger"
+	"video-transcription-service/pkg/transcribe"
 )
 
 func main() {
@@ -79,22 +81,37 @@ func main() {
 	jobRepo := jobs.NewRepository(db.Pool)
 	videoRepo := videos.NewRepository(db.Pool)
 
-	// 7. Temporary mock processor (to be wired with FFmpeg & Transcribe in Phases 8 & 9)
-	processor := func(ctx context.Context, msg *queue.TranscriptionMessage) error {
-		slog.Info("Processing job payload",
-			slog.String("job_id", msg.JobID.String()),
-			slog.String("video_key", msg.S3VideoKey),
-		)
-		// Simulating processing time
-		time.Sleep(100 * time.Millisecond)
-		return nil
+	// 7. Initialize FFmpeg Extractor
+	var extractor ffmpeg.Extractor = ffmpeg.NewCLIFFmpeg(5 * time.Minute)
+
+	// 8. Initialize Transcribe Provider
+	var transcribeProvider transcribe.Provider
+	awsProvider, err := transcribe.NewAWSTranscribeProvider(ctx, cfg.AWSRegion)
+	if err != nil {
+		if cfg.IsProduction() {
+			slog.Error("Worker failed to initialize AWS Transcribe", slog.Any("error", err))
+			os.Exit(1)
+		} else {
+			slog.Warn("AWS Transcribe initialization warning (using mock transcribe for dev)", slog.Any("error", err))
+			transcribeProvider = transcribe.NewMockTranscribeProvider()
+		}
+	} else {
+		transcribeProvider = awsProvider
 	}
 
-	// Suppress unused storageService warning until Phase 8
-	_ = storageService
+	// 9. Pipeline Processor
+	pipelineProcessor := worker.NewProcessor(
+		db,
+		storageService,
+		extractor,
+		transcribeProvider,
+		jobRepo,
+		videoRepo,
+		cfg.S3BucketName,
+	)
 
-	// 8. Start Worker
-	workerEngine := worker.NewWorker(jobQueue, jobRepo, videoRepo, processor)
+	// 10. Start Worker Engine
+	workerEngine := worker.NewWorker(jobQueue, jobRepo, videoRepo, pipelineProcessor.ProcessJob)
 
 	// Listen for shutdown signal
 	quit := make(chan os.Signal, 1)
