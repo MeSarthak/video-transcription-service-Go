@@ -32,8 +32,7 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    const ms = Math.floor((seconds % 1) * 10);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms}`;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const filteredSegments = segments.filter((seg) =>
@@ -57,60 +56,65 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
   }, [currentTime, autoScroll]);
 
   return (
-    <Card className="h-full flex flex-col border border-default-200 dark:border-default-800 bg-background/60 backdrop-blur-md shadow-sm">
-      {/* Header controls */}
-      <div className="p-4 border-b border-default-200 dark:border-default-800 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+    <Card className="h-full flex flex-col border border-default-200 dark:border-yt-border bg-background dark:bg-yt-dark shadow-lg rounded-2xl overflow-hidden">
+      {/* YouTube-style Transcript Drawer Header */}
+      <div className="p-4 border-b border-default-200 dark:border-yt-border flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
-            <Sparkles className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-foreground">Interactive Transcript</h3>
-            <p className="text-[11px] text-default-400">
-              {segments.length} timestamped subtitle segments
-            </p>
-          </div>
+          <h3 className="text-base font-bold text-foreground">Transcript</h3>
+          <span className="text-[11px] text-default-400 font-medium">
+            ({segments.length} cues)
+          </span>
         </div>
 
         <div className="flex items-center gap-2">
           <Button
             size="sm"
             variant="flat"
+            radius="full"
             onClick={() => setAutoScroll(!autoScroll)}
-            className={`text-xs ${autoScroll ? 'text-primary' : 'text-default-400'}`}
+            className={`text-xs font-semibold ${
+              autoScroll ? 'bg-yt-red/10 text-yt-red' : 'text-default-400'
+            }`}
           >
-            {autoScroll ? 'Auto-scroll: ON' : 'Auto-scroll: OFF'}
+            {autoScroll ? 'Auto-scroll On' : 'Auto-scroll Off'}
           </Button>
+
           <Button
             size="sm"
             variant="flat"
-            startContent={copiedFull ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
+            radius="full"
+            startContent={copiedFull ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
             onClick={handleCopyFull}
-            className="text-xs"
+            className="text-xs font-medium"
           >
-            {copiedFull ? 'Copied' : 'Copy All'}
+            {copiedFull ? 'Copied' : 'Copy'}
           </Button>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="p-3 border-b border-default-100 dark:border-default-800/60 bg-default-50/40 dark:bg-default-100/10">
+      {/* Search Input */}
+      <div className="p-3 border-b border-default-100 dark:border-yt-border/80 bg-default-50/50 dark:bg-yt-surface">
         <Input
           size="sm"
-          placeholder="Search keywords in transcript..."
+          radius="full"
+          placeholder="Search in transcript..."
           value={searchQuery}
           onValueChange={setSearchQuery}
-          startContent={<Search className="w-3.5 h-3.5 text-default-400" />}
+          startContent={<Search className="w-3.5 h-3.5 text-default-400 ml-1" />}
           isClearable
-          variant="bordered"
+          classNames={{
+            inputWrapper:
+              'bg-background dark:bg-yt-card border border-default-200 dark:border-yt-border focus-within:!border-yt-red',
+            input: 'text-xs text-foreground',
+          }}
         />
       </div>
 
-      {/* Segment List */}
-      <CardBody ref={containerRef} className="p-3 space-y-2 overflow-y-auto max-h-[520px]">
+      {/* Segment List (YouTube Transcript Layout) */}
+      <CardBody ref={containerRef} className="p-2 space-y-1 overflow-y-auto flex-1 max-h-[580px]">
         {filteredSegments.length === 0 ? (
-          <div className="text-center py-12 text-default-400 text-sm">
-            {searchQuery ? 'No matching cues found.' : 'No transcript segments available.'}
+          <div className="text-center py-16 text-default-400 text-xs">
+            {searchQuery ? 'No matching subtitle cues found.' : 'No transcript segments available.'}
           </div>
         ) : (
           filteredSegments.map((segment) => {
@@ -122,60 +126,40 @@ export const TranscriptViewer: React.FC<TranscriptViewerProps> = ({
                 key={segment.sequence_number}
                 ref={isActive ? activeSegmentRef : null}
                 onClick={() => onSeek(segment.start_time)}
-                className={`p-3 rounded-xl cursor-pointer transition-all duration-150 border ${
+                className={`p-2.5 rounded-xl cursor-pointer transition-all duration-150 flex items-start gap-3 border ${
                   isActive
-                    ? 'bg-primary-500/10 border-primary shadow-sm scale-[1.01]'
-                    : 'bg-default-50/50 dark:bg-default-100/20 border-transparent hover:border-default-300 dark:hover:border-default-700'
+                    ? 'bg-default-100 dark:bg-yt-surface border-l-4 border-l-yt-red border-t-transparent border-r-transparent border-b-transparent shadow-xs'
+                    : 'border-transparent hover:bg-default-100/60 dark:hover:bg-yt-surface/60'
                 }`}
               >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span
-                    className={`inline-flex items-center gap-1 text-xs font-mono font-semibold px-2 py-0.5 rounded-md ${
-                      isActive
-                        ? 'bg-primary text-white shadow-xs'
-                        : 'bg-default-200 dark:bg-default-800 text-default-600'
-                    }`}
-                  >
-                    <Clock className="w-3 h-3" />
-                    {formatTime(segment.start_time)} - {formatTime(segment.end_time)}
-                  </span>
-
-                  <div className="flex items-center gap-1.5">
-                    {segment.confidence > 0 && (
-                      <Tooltip content={`Transcription confidence: ${(segment.confidence * 100).toFixed(0)}%`}>
-                        <Chip
-                          size="sm"
-                          variant="dot"
-                          color={segment.confidence > 0.85 ? 'success' : 'warning'}
-                          className="h-5 text-[10px]"
-                        >
-                          {(segment.confidence * 100).toFixed(0)}%
-                        </Chip>
-                      </Tooltip>
-                    )}
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      variant="light"
-                      className="w-6 h-6 min-w-6 text-default-400 hover:text-primary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSeek(segment.start_time);
-                      }}
-                      aria-label="Play segment"
-                    >
-                      <Play className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-
-                <p
-                  className={`text-sm leading-relaxed ${
-                    isActive ? 'text-foreground font-medium' : 'text-default-700 dark:text-default-300'
+                {/* Clickable Blue/Red Timestamp Pill */}
+                <span
+                  className={`text-xs font-mono font-bold shrink-0 mt-0.5 px-2 py-0.5 rounded-md ${
+                    isActive
+                      ? 'bg-yt-red text-white'
+                      : 'text-blue-500 hover:text-blue-400 dark:text-blue-400 bg-blue-500/10'
                   }`}
                 >
-                  {segment.text}
-                </p>
+                  {formatTime(segment.start_time)}
+                </span>
+
+                {/* Cue Text */}
+                <div className="flex-1 min-w-0">
+                  <p
+                    className={`text-xs sm:text-sm leading-relaxed ${
+                      isActive ? 'text-foreground font-semibold' : 'text-default-700 dark:text-default-300'
+                    }`}
+                  >
+                    {segment.text}
+                  </p>
+                </div>
+
+                {/* Confidence Badge */}
+                {segment.confidence > 0 && (
+                  <span className="text-[10px] text-default-400 font-mono shrink-0">
+                    {(segment.confidence * 100).toFixed(0)}%
+                  </span>
+                )}
               </div>
             );
           })

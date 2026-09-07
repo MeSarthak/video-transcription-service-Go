@@ -73,14 +73,21 @@ func (w *Worker) Start(ctx context.Context) error {
 			// 2. Fallback check for local development: check PostgreSQL directly for queued jobs
 			nextJob, err := w.jobRepo.GetNextQueuedJob(ctx)
 			if err == nil && nextJob != nil {
+				var storageKey string
+				vid, vErr := w.videoRepo.GetByID(ctx, nextJob.VideoID, nextJob.UserID)
+				if vErr == nil && vid != nil {
+					storageKey = vid.StorageKey
+				}
+
 				slog.Info("Found queued job in database (local queue dispatch)", slog.String("job_id", nextJob.ID.String()))
 				syntheticMsg := &queue.ReceivedMessage{
 					Message: &queue.TranscriptionMessage{
-						JobID:    nextJob.ID,
-						VideoID:  nextJob.VideoID,
-						UserID:   nextJob.UserID,
-						Language: nextJob.Language,
-						Attempt:  nextJob.Attempts + 1,
+						JobID:      nextJob.ID,
+						VideoID:    nextJob.VideoID,
+						UserID:     nextJob.UserID,
+						S3VideoKey: storageKey,
+						Language:   nextJob.Language,
+						Attempt:    nextJob.Attempts + 1,
 					},
 					ReceiptHandle:           fmt.Sprintf("db-job-%s", nextJob.ID.String()),
 					ApproximateReceiveCount: nextJob.Attempts + 1,

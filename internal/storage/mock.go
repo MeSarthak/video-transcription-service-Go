@@ -20,7 +20,10 @@ type MockStorage struct {
 }
 
 func NewMockStorage() *MockStorage {
-	baseDir := filepath.Join(os.TempDir(), "transcription_storage")
+	baseDir := os.Getenv("STORAGE_DIR")
+	if baseDir == "" {
+		baseDir = filepath.Join(os.TempDir(), "transcription_storage")
+	}
 	_ = os.MkdirAll(baseDir, 0755)
 
 	return &MockStorage{

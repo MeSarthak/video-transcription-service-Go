@@ -11,25 +11,29 @@ import {
   DropdownMenu,
   DropdownItem,
   Avatar,
+  Input,
 } from '@heroui/react';
 import {
-  Video as VideoIcon,
+  Play,
   Cpu,
   Sun,
   Moon,
   LogOut,
-  Upload,
+  Plus,
   User as UserIcon,
-  Code2,
+  Search,
+  LayoutGrid,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
 interface NavbarProps {
   onOpenUpload?: () => void;
+  searchQuery?: string;
+  onSearchChange?: (val: string) => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenUpload }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onOpenUpload, searchQuery, onSearchChange }) => {
   const { user, logout, isAuthenticated } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
@@ -39,105 +43,121 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenUpload }) => {
 
   return (
     <HeroNavbar
-      maxWidth="xl"
+      maxWidth="full"
       isBordered
-      className="bg-background/70 backdrop-blur-md sticky top-0 z-50 shadow-sm"
+      className="bg-background/95 dark:bg-yt-dark/95 backdrop-blur-md sticky top-0 z-50 border-b border-default-200 dark:border-yt-border px-2 sm:px-6 h-16"
     >
-      <NavbarBrand>
-        <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="p-2 rounded-xl bg-gradient-to-tr from-primary-600 to-indigo-500 text-white shadow-md shadow-primary-500/20 group-hover:scale-105 transition-transform">
-            <VideoIcon className="w-5 h-5" />
+      {/* Brand / Logo */}
+      <NavbarBrand className="gap-3 max-w-fit">
+        <Link to="/" className="flex items-center gap-2 group">
+          <div className="w-9 h-7 rounded-lg bg-yt-red text-white flex items-center justify-center shadow-md shadow-red-600/30 group-hover:scale-105 transition-transform">
+            <Play className="w-4 h-4 fill-white ml-0.5" />
           </div>
-          <div className="flex flex-col">
-            <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-primary-500 to-indigo-400 bg-clip-text text-transparent">
-              TranscribeX
+          <div className="flex items-baseline gap-1">
+            <span className="font-extrabold text-xl tracking-tight text-foreground font-sans">
+              Transcribe<span className="text-yt-red">X</span>
             </span>
-            <span className="text-[10px] text-default-400 uppercase tracking-widest font-semibold">
-              Distributed Engine
+            <span className="text-[10px] text-default-400 font-bold tracking-wider uppercase font-mono px-1 rounded bg-default-100 dark:bg-yt-surface">
+              STUDIO
             </span>
           </div>
         </Link>
       </NavbarBrand>
 
-      <NavbarContent className="hidden sm:flex gap-4" justify="center">
-        <NavbarItem isActive={isDashboard}>
-          <Link
-            to="/"
-            className={`text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${
-              isDashboard
-                ? 'text-primary font-semibold bg-primary/10'
-                : 'text-default-600 hover:text-foreground'
-            }`}
-          >
-            Dashboard
-          </Link>
-        </NavbarItem>
-        <NavbarItem isActive={isArchitecture}>
-          <Link
-            to="/architecture"
-            className={`text-sm font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
-              isArchitecture
-                ? 'text-primary font-semibold bg-primary/10'
-                : 'text-default-600 hover:text-foreground'
-            }`}
-          >
-            <Cpu className="w-4 h-4 text-primary" />
-            <span>Architecture & Design</span>
-          </Link>
-        </NavbarItem>
+      {/* Center Search Pill (YouTube style) */}
+      <NavbarContent className="hidden md:flex flex-1 max-w-xl mx-4" justify="center">
+        <div className="w-full">
+          <Input
+            size="sm"
+            radius="full"
+            placeholder="Search your transcribed videos..."
+            value={searchQuery || ''}
+            onValueChange={onSearchChange}
+            startContent={<Search className="w-4 h-4 text-default-400 ml-1" />}
+            classNames={{
+              inputWrapper:
+                'bg-default-100/70 dark:bg-yt-surface border border-default-200 dark:border-yt-border hover:border-default-400 dark:hover:border-default-600 focus-within:!border-yt-red transition-all',
+              input: 'text-xs text-foreground',
+            }}
+            isClearable
+          />
+        </div>
       </NavbarContent>
 
-      <NavbarContent justify="end" className="gap-2">
+      {/* Right Controls */}
+      <NavbarContent justify="end" className="gap-2 sm:gap-3">
+        {/* Navigation Tabs */}
+        <NavbarItem className="hidden sm:flex">
+          <Button
+            as={Link}
+            to="/"
+            variant="light"
+            size="sm"
+            radius="full"
+            startContent={<LayoutGrid className="w-4 h-4" />}
+            className={`text-xs font-semibold ${
+              isDashboard ? 'bg-default-200/60 dark:bg-yt-surface text-foreground font-bold' : 'text-default-500 hover:text-foreground'
+            }`}
+          >
+            Videos
+          </Button>
+        </NavbarItem>
+
+        <NavbarItem>
+          <Button
+            as={Link}
+            to="/architecture"
+            variant="light"
+            size="sm"
+            radius="full"
+            startContent={<Cpu className="w-4 h-4 text-yt-red" />}
+            className={`text-xs font-semibold ${
+              isArchitecture ? 'bg-default-200/60 dark:bg-yt-surface text-foreground font-bold' : 'text-default-500 hover:text-foreground'
+            }`}
+          >
+            Architecture
+          </Button>
+        </NavbarItem>
+
+        {/* YouTube "+ Create" Upload Pill Button */}
+        {isAuthenticated && onOpenUpload && (
+          <NavbarItem>
+            <Button
+              size="sm"
+              radius="full"
+              startContent={<Plus className="w-4 h-4 text-white stroke-[3]" />}
+              onClick={onOpenUpload}
+              className="bg-yt-red hover:bg-red-700 text-white font-semibold text-xs shadow-sm shadow-red-600/30 px-3.5"
+            >
+              Create
+            </Button>
+          </NavbarItem>
+        )}
+
+        {/* Theme Toggle */}
         <NavbarItem>
           <Button
             isIconOnly
             variant="light"
             size="sm"
+            radius="full"
             onClick={toggleTheme}
             aria-label="Toggle theme"
-            className="text-default-500"
+            className="text-default-500 hover:text-foreground"
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </Button>
         </NavbarItem>
 
-        <NavbarItem>
-          <Button
-            isIconOnly
-            as="a"
-            href="https://github.com"
-            target="_blank"
-            variant="light"
-            size="sm"
-            aria-label="GitHub"
-            className="text-default-500"
-          >
-            <Code2 className="w-4 h-4" />
-          </Button>
-        </NavbarItem>
-
-        {isAuthenticated && onOpenUpload && (
-          <NavbarItem>
-            <Button
-              color="primary"
-              size="sm"
-              startContent={<Upload className="w-4 h-4" />}
-              onClick={onOpenUpload}
-              className="font-medium shadow-md shadow-primary/20"
-            >
-              Upload Video
-            </Button>
-          </NavbarItem>
-        )}
-
+        {/* User Account / Sign In */}
         {isAuthenticated ? (
           <NavbarItem>
             <Dropdown placement="bottom-end">
               <DropdownTrigger>
                 <Avatar
                   as="button"
-                  className="transition-transform ring-2 ring-primary/30 w-8 h-8 cursor-pointer"
-                  color="primary"
+                  className="transition-transform ring-2 ring-yt-red/40 w-8 h-8 cursor-pointer text-xs font-bold"
+                  color="danger"
                   name={user?.email?.slice(0, 2).toUpperCase()}
                   size="sm"
                 />
@@ -165,10 +185,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenUpload }) => {
             <Button
               as={Link}
               to="/login"
-              color="primary"
+              color="danger"
               variant="flat"
               size="sm"
+              radius="full"
               startContent={<UserIcon className="w-4 h-4" />}
+              className="font-semibold text-xs"
             >
               Sign In
             </Button>

@@ -26,7 +26,9 @@ import {
   RefreshCw,
   Sparkles,
   GitBranch,
+  Network,
 } from 'lucide-react';
+import { ArchitectureDiagrams } from '../components/ArchitectureDiagrams';
 
 export const ArchitecturePage: React.FC = () => {
   const [activeStep, setActiveStep] = useState(0);
@@ -180,21 +182,37 @@ err := db.WithTx(ctx, func(tx pgx.Tx) error {
       {/* Navigation Tabs */}
       <Tabs
         aria-label="Architecture Sections"
-        color="primary"
+        color="danger"
         variant="underlined"
+        defaultSelectedKey="diagrams"
         classNames={{
-          tabList: 'gap-6 w-full border-b border-default-200 dark:border-default-800',
-          cursor: 'w-full bg-primary',
+          tabList: 'gap-6 w-full border-b border-default-200 dark:border-yt-border',
+          cursor: 'w-full bg-yt-red',
           tab: 'max-w-fit px-0 h-12 text-sm font-medium',
         }}
       >
-        {/* TAB 1: INTERACTIVE SYSTEM FLOW */}
+        {/* TAB 1: VISUAL ARCHITECTURE DIAGRAMS */}
+        <Tab
+          key="diagrams"
+          title={
+            <div className="flex items-center gap-2 text-yt-red font-semibold">
+              <Network className="w-4 h-4 text-yt-red" />
+              <span>Interactive Architecture Diagrams</span>
+            </div>
+          }
+        >
+          <div className="pt-6">
+            <ArchitectureDiagrams />
+          </div>
+        </Tab>
+
+        {/* TAB 2: INTERACTIVE SYSTEM FLOW */}
         <Tab
           key="flow"
           title={
             <div className="flex items-center gap-2">
               <Layers className="w-4 h-4" />
-              <span>Interactive Pipeline Flow</span>
+              <span>Pipeline Deep Dive</span>
             </div>
           }
         >

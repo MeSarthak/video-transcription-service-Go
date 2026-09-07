@@ -49,42 +49,43 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-6">
-          <div className="inline-flex p-3 rounded-2xl bg-gradient-to-tr from-primary-600 to-indigo-500 text-white shadow-xl shadow-primary-500/20 mb-3">
-            <VideoIcon className="w-8 h-8" />
+    <div className="min-h-[80vh] flex items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center space-y-2">
+          <div className="w-14 h-10 rounded-xl bg-yt-red text-white flex items-center justify-center shadow-lg shadow-red-600/30 mx-auto">
+            <VideoIcon className="w-6 h-6 fill-white ml-0.5" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            {isRegister ? 'Create an Account' : 'Welcome Back'}
+          <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
+            {isRegister ? 'Create your Studio Account' : 'Sign in to TranscribeX'}
           </h1>
-          <p className="text-xs text-default-400 mt-1">
-            Sign in to access distributed video transcription and cloud pipelines
+          <p className="text-xs text-default-400">
+            Distributed asynchronous speech recognition & media processing
           </p>
         </div>
 
-        <Card className="border border-default-200 dark:border-default-800 shadow-xl bg-background/80 backdrop-blur-lg">
-          <CardHeader className="pb-0 pt-6 px-6 flex justify-between items-center">
-            <span className="text-sm font-semibold uppercase tracking-wider text-primary">
-              {isRegister ? 'Registration' : 'Sign In'}
+        <Card className="border border-default-200 dark:border-yt-border shadow-2xl bg-background dark:bg-yt-dark rounded-3xl">
+          <CardHeader className="pb-0 pt-6 px-6 flex justify-between items-center border-b border-default-100 dark:border-yt-border pb-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-yt-red">
+              {isRegister ? 'Registration' : 'Authentication'}
             </span>
             <Button
               size="sm"
               variant="light"
-              color="primary"
+              radius="full"
+              className="text-xs font-semibold text-default-400 hover:text-foreground"
               onClick={() => {
                 setIsRegister(!isRegister);
                 setError(null);
               }}
             >
-              {isRegister ? 'Have an account? Sign In' : "Don't have an account? Sign Up"}
+              {isRegister ? 'Have an account? Sign In' : "New? Create Account"}
             </Button>
           </CardHeader>
 
-          <CardBody className="p-6">
+          <CardBody className="p-6 space-y-4">
             {error && (
-              <div className="p-3 mb-4 bg-danger-50 dark:bg-danger-900/20 text-danger border border-danger-200 dark:border-danger-800 rounded-xl text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <div className="p-3 bg-danger-500/10 text-danger border border-danger-500/30 rounded-2xl text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
@@ -98,7 +99,11 @@ export const LoginPage: React.FC = () => {
                 onValueChange={setEmail}
                 startContent={<Mail className="w-4 h-4 text-default-400" />}
                 variant="bordered"
+                radius="lg"
                 isRequired
+                classNames={{
+                  inputWrapper: 'border-default-200 dark:border-yt-border focus-within:!border-yt-red',
+                }}
               />
 
               <Input
@@ -109,25 +114,29 @@ export const LoginPage: React.FC = () => {
                 onValueChange={setPassword}
                 startContent={<Lock className="w-4 h-4 text-default-400" />}
                 variant="bordered"
+                radius="lg"
                 isRequired
+                classNames={{
+                  inputWrapper: 'border-default-200 dark:border-yt-border focus-within:!border-yt-red',
+                }}
               />
 
               <Button
                 type="submit"
-                color="primary"
                 fullWidth
+                radius="full"
                 isLoading={loading}
                 endContent={!loading && <ArrowRight className="w-4 h-4" />}
-                className="mt-2 font-medium shadow-md shadow-primary/20"
+                className="mt-2 bg-yt-red hover:bg-red-700 text-white font-semibold text-sm shadow-md shadow-red-600/30 h-11"
               >
                 {isRegister ? 'Create Account' : 'Sign In'}
               </Button>
             </form>
 
-            <div className="mt-6 pt-6 border-t border-default-100 dark:border-default-800 text-center">
+            <div className="pt-4 border-t border-default-100 dark:border-yt-border text-center">
               <div className="flex items-center justify-center gap-1.5 text-xs text-default-400">
-                <CheckCircle className="w-3.5 h-3.5 text-success" />
-                <span>JWT Access + Refresh Token pairs</span>
+                <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                <span>HMAC-SHA256 Cryptographic Sessions</span>
               </div>
             </div>
           </CardBody>

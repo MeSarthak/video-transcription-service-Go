@@ -120,19 +120,27 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
       size="lg"
       backdrop="blur"
       placement="center"
+      classNames={{
+        base: 'bg-background dark:bg-yt-dark border border-default-200 dark:border-yt-border rounded-3xl shadow-2xl',
+        header: 'border-b border-default-200 dark:border-yt-border pb-3',
+        footer: 'border-t border-default-200 dark:border-yt-border pt-3',
+      }}
     >
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-1">
-          <h2 className="text-xl font-bold tracking-tight">Upload Video for Transcription</h2>
+        <ModalHeader className="flex flex-col gap-0.5">
+          <h2 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-yt-red" />
+            Upload Video to TranscribeX Studio
+          </h2>
           <p className="text-xs text-default-400 font-normal">
-            Streaming upload &bull; Asynchronous transcription worker pipeline
+            Direct high-speed streaming upload &bull; Asynchronous 16kHz FFmpeg worker engine
           </p>
         </ModalHeader>
 
-        <ModalBody className="py-4">
+        <ModalBody className="py-5">
           {error && (
-            <div className="p-3 bg-danger-50 dark:bg-danger-900/20 text-danger border border-danger-200 dark:border-danger-800 rounded-xl text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <div className="p-3 bg-danger-500/10 text-danger border border-danger-500/30 rounded-2xl text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
@@ -151,30 +159,37 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-default-300 dark:border-default-700 hover:border-primary rounded-2xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors bg-default-50/50 hover:bg-default-100/50"
+                className="border-2 border-dashed border-default-300 dark:border-yt-border hover:border-yt-red rounded-3xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all bg-default-50/50 dark:bg-yt-surface/50 hover:bg-yt-red/5 group"
               >
-                <div className="p-3 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary">
+                <div className="w-16 h-16 rounded-full bg-yt-red/10 text-yt-red flex items-center justify-center group-hover:scale-110 transition-transform shadow-md shadow-red-600/10">
                   <UploadCloud className="w-8 h-8" />
                 </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-foreground">
-                    Click to browse or drag & drop media file
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-bold text-foreground">
+                    Select video files to transcribe
                   </p>
-                  <p className="text-xs text-default-400 mt-1">
-                    MP4, WebM, MOV, MKV, MP3, WAV, M4A (up to 500MB)
+                  <p className="text-xs text-default-400">
+                    MP4, WebM, MOV, MKV (zero-memory presigned streaming up to 500MB)
                   </p>
                 </div>
+                <Button
+                  size="sm"
+                  radius="full"
+                  className="bg-default-200 dark:bg-yt-card text-foreground font-semibold text-xs mt-1 pointer-events-none"
+                >
+                  Select Files
+                </Button>
               </div>
             ) : (
-              <div className="p-4 border border-default-200 dark:border-default-800 rounded-2xl bg-default-50 dark:bg-default-100/30 flex items-center justify-between">
+              <div className="p-4 border border-default-200 dark:border-yt-border rounded-2xl bg-default-50 dark:bg-yt-surface flex items-center justify-between">
                 <div className="flex items-center gap-3 truncate">
-                  <div className="p-2.5 rounded-xl bg-primary-500/10 text-primary">
-                    <FileVideo className="w-6 h-6" />
+                  <div className="w-10 h-10 rounded-xl bg-yt-red/10 text-yt-red flex items-center justify-center shrink-0">
+                    <FileVideo className="w-5 h-5" />
                   </div>
                   <div className="truncate">
-                    <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
+                    <p className="text-sm font-semibold text-foreground truncate">{file.name}</p>
                     <p className="text-xs text-default-400">
-                      {(file.size / (1024 * 1024)).toFixed(2)} MB &bull; {file.type || 'media'}
+                      {(file.size / (1024 * 1024)).toFixed(2)} MB &bull; {file.type || 'video/mp4'}
                     </p>
                   </div>
                 </div>
@@ -182,8 +197,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
                   <Button
                     size="sm"
                     variant="light"
+                    radius="full"
                     color="danger"
                     onClick={() => setFile(null)}
+                    className="text-xs font-semibold"
                   >
                     Change
                   </Button>
@@ -193,47 +210,55 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
 
             {uploading && (
               <div className="space-y-2 pt-2">
-                <div className="flex justify-between text-xs font-medium">
-                  <span className="text-default-500 flex items-center gap-1.5">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-default-400 flex items-center gap-1.5">
                     {progress === 100 ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                     ) : (
-                      <span className="w-2 h-2 rounded-full bg-primary animate-ping" />
+                      <span className="w-2 h-2 rounded-full bg-yt-red animate-ping" />
                     )}
                     {statusText}
                   </span>
-                  <span className="text-primary font-semibold">{progress}%</span>
+                  <span className="text-yt-red font-mono">{progress}%</span>
                 </div>
                 <Progress
                   value={progress}
-                  color={progress === 100 ? 'success' : 'primary'}
+                  color={progress === 100 ? 'success' : 'danger'}
                   size="sm"
+                  radius="full"
                   aria-label="Upload progress"
+                  classNames={{
+                    indicator: progress === 100 ? 'bg-emerald-500' : 'bg-yt-red',
+                  }}
                 />
               </div>
             )}
           </div>
         </ModalBody>
 
-        <ModalFooter>
+        <ModalFooter className="gap-2">
           <Button
             variant="flat"
+            radius="full"
+            size="sm"
             onPress={() => {
               resetState();
               onClose();
             }}
             isDisabled={uploading}
+            className="text-xs font-semibold"
           >
             Cancel
           </Button>
           <Button
-            color="primary"
+            size="sm"
+            radius="full"
             onPress={handleUpload}
             isLoading={uploading}
-            isDisabled={!file}
-            className="shadow-md shadow-primary/20"
+            isDisabled={!file || uploading}
+            className="bg-yt-red hover:bg-red-700 text-white font-semibold text-xs shadow-md shadow-red-600/30 px-5"
           >
-            {uploading ? 'Uploading...' : 'Upload & Transcribe'}
+            Upload & Transcribe
           </Button>
         </ModalFooter>
       </ModalContent>

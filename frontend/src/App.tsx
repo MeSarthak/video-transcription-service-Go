@@ -54,10 +54,10 @@ const AppContent: React.FC = () => {
         </Routes>
       </main>
 
-      <footer className="border-t border-default-200 dark:border-default-800 py-6 text-center text-xs text-default-400">
+      <footer className="border-t border-default-200 dark:border-yt-border py-6 text-center text-xs text-default-400 bg-background dark:bg-yt-dark">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>&copy; {new Date().getFullYear()} TranscribeX &bull; Distributed Video Transcription Engine</span>
-          <span className="font-mono text-[11px]">Go net/http &bull; AWS S3/SQS &bull; PostgreSQL 16 &bull; HeroUI</span>
+          <span className="font-medium">&copy; {new Date().getFullYear()} TranscribeX &bull; Distributed Video Transcription Engine</span>
+          <span className="font-mono text-[11px] text-default-400">Go net/http &bull; AWS S3/SQS &bull; PostgreSQL 16 &bull; HeroUI</span>
         </div>
       </footer>
 

@@ -78,7 +78,31 @@ func (f *CLIFFmpeg) ExtractAudio(ctx context.Context, inputVideoPath, outputAudi
 	)
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%w: %v, stderr: %s", ErrExtractionFailed, err, stderr.String())
+		errStr := stderr.String()
+		if strings.Contains(errStr, "Output file does not contain any stream") || strings.Contains(errStr, "does not contain any stream") {
+			slog.Warn("No audio stream detected in video, generating silent audio track fallback", slog.String("input", inputVideoPath))
+			dur, _ := f.GetDuration(ctx, inputVideoPath)
+			if dur <= 0 {
+				dur = 1.0
+			}
+			silentArgs := []string{
+				"-y",
+				"-f", "lavfi",
+				"-i", "anullsrc=r=16000:cl=mono",
+				"-t", fmt.Sprintf("%.3f", dur),
+				"-acodec", "pcm_s16le",
+				outputAudioPath,
+			}
+			silentCmd := exec.CommandContext(execCtx, f.ffmpegPath, silentArgs...)
+			var silentStderr bytes.Buffer
+			silentCmd.Stderr = &silentStderr
+			sErr := silentCmd.Run()
+			if sErr == nil {
+				return nil
+			}
+			slog.Error("Failed to generate silent audio fallback", slog.Any("error", sErr), slog.String("stderr", silentStderr.String()))
+		}
+		return fmt.Errorf("%w: %v, stderr: %s", ErrExtractionFailed, err, errStr)
 	}
 
 	return nil

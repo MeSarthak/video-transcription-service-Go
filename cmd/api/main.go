@@ -69,32 +69,42 @@ func main() {
 
 	// 4. Initialize S3 Storage Service
 	var storageService storage.Service
-	s3Store, err := storage.NewS3Storage(ctx, cfg.AWSRegion, cfg.S3BucketName)
-	if err != nil {
-		if cfg.IsProduction() {
-			slog.Error("AWS S3 initialization failed in production", slog.Any("error", err))
-			os.Exit(1)
-		} else {
-			slog.Warn("AWS S3 initialization warning (using mock storage for local dev)", slog.Any("error", err))
-			storageService = storage.NewMockStorage()
-		}
+	if !cfg.HasAWSCredentials() && !cfg.IsProduction() {
+		slog.Info("Using Mock Storage for local development (no AWS credentials configured)")
+		storageService = storage.NewMockStorage()
 	} else {
-		storageService = s3Store
+		s3Store, err := storage.NewS3Storage(ctx, cfg.AWSRegion, cfg.S3BucketName)
+		if err != nil {
+			if cfg.IsProduction() {
+				slog.Error("AWS S3 initialization failed in production", slog.Any("error", err))
+				os.Exit(1)
+			} else {
+				slog.Warn("AWS S3 initialization warning (using mock storage for local dev)", slog.Any("error", err))
+				storageService = storage.NewMockStorage()
+			}
+		} else {
+			storageService = s3Store
+		}
 	}
 
 	// 5. Initialize SQS Queue Service
 	var jobQueue queue.Queue
-	sqsQueue, err := queue.NewSQSQueue(ctx, cfg.AWSRegion, cfg.SQSQueueURL)
-	if err != nil {
-		if cfg.IsProduction() {
-			slog.Error("AWS SQS initialization failed in production", slog.Any("error", err))
-			os.Exit(1)
-		} else {
-			slog.Warn("AWS SQS initialization warning (using mock queue for local dev)", slog.Any("error", err))
-			jobQueue = queue.NewMockQueue()
-		}
+	if !cfg.HasValidSQS() && !cfg.IsProduction() {
+		slog.Info("Using Mock Queue for local development (no AWS credentials configured or placeholder SQS URL)")
+		jobQueue = queue.NewMockQueue()
 	} else {
-		jobQueue = sqsQueue
+		sqsQueue, err := queue.NewSQSQueue(ctx, cfg.AWSRegion, cfg.SQSQueueURL)
+		if err != nil {
+			if cfg.IsProduction() {
+				slog.Error("AWS SQS initialization failed in production", slog.Any("error", err))
+				os.Exit(1)
+			} else {
+				slog.Warn("AWS SQS initialization warning (using mock queue for local dev)", slog.Any("error", err))
+				jobQueue = queue.NewMockQueue()
+			}
+		} else {
+			jobQueue = sqsQueue
+		}
 	}
 
 	// 6. Set Gin mode

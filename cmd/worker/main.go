@@ -49,32 +49,42 @@ func main() {
 
 	// 4. Initialize S3 Storage
 	var storageService storage.Service
-	s3Store, err := storage.NewS3Storage(ctx, cfg.AWSRegion, cfg.S3BucketName)
-	if err != nil {
-		if cfg.IsProduction() {
-			slog.Error("Worker failed to initialize AWS S3", slog.Any("error", err))
-			os.Exit(1)
-		} else {
-			slog.Warn("AWS S3 initialization warning (using mock storage for dev)", slog.Any("error", err))
-			storageService = storage.NewMockStorage()
-		}
+	if !cfg.HasAWSCredentials() && !cfg.IsProduction() {
+		slog.Info("Using Mock Storage for local development (no AWS credentials configured)")
+		storageService = storage.NewMockStorage()
 	} else {
-		storageService = s3Store
+		s3Store, err := storage.NewS3Storage(ctx, cfg.AWSRegion, cfg.S3BucketName)
+		if err != nil {
+			if cfg.IsProduction() {
+				slog.Error("Worker failed to initialize AWS S3", slog.Any("error", err))
+				os.Exit(1)
+			} else {
+				slog.Warn("AWS S3 initialization warning (using mock storage for dev)", slog.Any("error", err))
+				storageService = storage.NewMockStorage()
+			}
+		} else {
+			storageService = s3Store
+		}
 	}
 
 	// 5. Initialize SQS Queue
 	var jobQueue queue.Queue
-	sqsQueue, err := queue.NewSQSQueue(ctx, cfg.AWSRegion, cfg.SQSQueueURL)
-	if err != nil {
-		if cfg.IsProduction() {
-			slog.Error("Worker failed to initialize AWS SQS", slog.Any("error", err))
-			os.Exit(1)
-		} else {
-			slog.Warn("AWS SQS initialization warning (using mock queue for dev)", slog.Any("error", err))
-			jobQueue = queue.NewMockQueue()
-		}
+	if !cfg.HasValidSQS() && !cfg.IsProduction() {
+		slog.Info("Using Mock Queue for local development (no AWS credentials configured or placeholder SQS URL)")
+		jobQueue = queue.NewMockQueue()
 	} else {
-		jobQueue = sqsQueue
+		sqsQueue, err := queue.NewSQSQueue(ctx, cfg.AWSRegion, cfg.SQSQueueURL)
+		if err != nil {
+			if cfg.IsProduction() {
+				slog.Error("Worker failed to initialize AWS SQS", slog.Any("error", err))
+				os.Exit(1)
+			} else {
+				slog.Warn("AWS SQS initialization warning (using mock queue for dev)", slog.Any("error", err))
+				jobQueue = queue.NewMockQueue()
+			}
+		} else {
+			jobQueue = sqsQueue
+		}
 	}
 
 	// 6. Repositories
@@ -86,17 +96,22 @@ func main() {
 
 	// 8. Initialize Transcribe Provider
 	var transcribeProvider transcribe.Provider
-	awsProvider, err := transcribe.NewAWSTranscribeProvider(ctx, cfg.AWSRegion)
-	if err != nil {
-		if cfg.IsProduction() {
-			slog.Error("Worker failed to initialize AWS Transcribe", slog.Any("error", err))
-			os.Exit(1)
-		} else {
-			slog.Warn("AWS Transcribe initialization warning (using mock transcribe for dev)", slog.Any("error", err))
-			transcribeProvider = transcribe.NewMockTranscribeProvider()
-		}
+	if !cfg.HasAWSCredentials() && !cfg.IsProduction() {
+		slog.Info("Using Mock Transcribe Provider for local development (no AWS credentials configured)")
+		transcribeProvider = transcribe.NewMockTranscribeProvider()
 	} else {
-		transcribeProvider = awsProvider
+		awsProvider, err := transcribe.NewAWSTranscribeProvider(ctx, cfg.AWSRegion)
+		if err != nil {
+			if cfg.IsProduction() {
+				slog.Error("Worker failed to initialize AWS Transcribe", slog.Any("error", err))
+				os.Exit(1)
+			} else {
+				slog.Warn("AWS Transcribe initialization warning (using mock transcribe for dev)", slog.Any("error", err))
+				transcribeProvider = transcribe.NewMockTranscribeProvider()
+			}
+		} else {
+			transcribeProvider = awsProvider
+		}
 	}
 
 	// 9. Pipeline Processor

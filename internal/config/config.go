@@ -91,6 +91,16 @@ func (c *Config) IsProduction() bool {
 	return strings.ToLower(c.Env) == "production"
 }
 
+func (c *Config) HasAWSCredentials() bool {
+	accessKey := os.Getenv("AWS_ACCESS_KEY_ID")
+	secretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+	return accessKey != "" && secretKey != ""
+}
+
+func (c *Config) HasValidSQS() bool {
+	return c.HasAWSCredentials() && c.SQSQueueURL != "" && !strings.Contains(c.SQSQueueURL, "123456789012")
+}
+
 func getEnv(key, defaultVal string) string {
 	if val, exists := os.LookupEnv(key); exists && val != "" {
 		return val

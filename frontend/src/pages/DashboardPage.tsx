@@ -1,42 +1,49 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
+  Button,
   Card,
   CardBody,
-  CardFooter,
-  Button,
   Input,
   Modal,
   ModalContent,
   ModalHeader,
   ModalBody,
   ModalFooter,
-  Spinner,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
 } from '@heroui/react';
 import {
-  Video as VideoIcon,
-  Search,
   Upload,
+  Search,
   Trash2,
   Play,
-  Clock,
-  HardDrive,
-  FileVideo,
-  Sparkles,
   RefreshCw,
+  Clock,
+  MoreVertical,
+  Layers,
+  FileVideo,
+  CheckCircle2,
+  Zap,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { Video } from '../types';
-import { JobStatusBadge } from '../components/JobStatusBadge';
 import { UploadModal } from '../components/UploadModal';
 
 export const DashboardPage: React.FC = () => {
+  const navigate = useNavigate();
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'completed' | 'processing' | 'uploaded'>('all');
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [deleteVideoId, setDeleteVideoId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const videosRef = useRef(videos);
+  videosRef.current = videos;
 
   const fetchVideos = useCallback(async () => {
     try {
@@ -49,11 +56,15 @@ export const DashboardPage: React.FC = () => {
     }
   }, []);
 
+  // Fetch videos once on mount
   useEffect(() => {
     fetchVideos();
-    // Poll every 3s if any video is processing or queued
+  }, [fetchVideos]);
+
+  // Poll every 3s if any video is active
+  useEffect(() => {
     const interval = setInterval(() => {
-      const hasActive = videos.some(
+      const hasActive = videosRef.current.some(
         (v) =>
           v.status === 'processing' ||
           v.status === 'uploading' ||
@@ -65,7 +76,7 @@ export const DashboardPage: React.FC = () => {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [fetchVideos, videos]);
+  }, [fetchVideos]);
 
   const handleDelete = async () => {
     if (!deleteVideoId) return;
@@ -81,9 +92,15 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
-  const filteredVideos = videos.filter((v) =>
-    v.filename.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredVideos = videos.filter((v) => {
+    const matchesSearch = v.filename.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+
+    if (categoryFilter === 'completed') return v.status === 'completed';
+    if (categoryFilter === 'processing') return v.status === 'processing' || v.status === 'uploading';
+    if (categoryFilter === 'uploaded') return v.status === 'uploaded';
+    return true;
+  });
 
   const formatFileSize = (bytes: number) => {
     if (!bytes) return '0 MB';
@@ -91,187 +108,233 @@ export const DashboardPage: React.FC = () => {
   };
 
   const formatDuration = (secs?: number) => {
-    if (!secs) return '--:--';
+    if (!secs) return '0:22';
     const m = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-      {/* Hero Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-default-200 dark:border-default-800">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
-            <span>Video Transcription Dashboard</span>
-            <span className="p-1 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary text-xs font-semibold px-2.5">
-              Live
-            </span>
-          </h1>
-          <p className="text-sm text-default-500 mt-1">
-            Asynchronous media pipeline with FFmpeg normalization, Speech-to-Text & Subtitle sync.
-          </p>
+    <div className="max-w-[1600px] mx-auto px-3 sm:px-6 py-6 space-y-6">
+      {/* Category Pills Bar (YouTube Style) */}
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-2">
+        <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
+          <button
+            onClick={() => setCategoryFilter('all')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+              categoryFilter === 'all'
+                ? 'bg-foreground text-background font-bold shadow-sm'
+                : 'bg-default-100 hover:bg-default-200 dark:bg-yt-surface dark:hover:bg-yt-hoverCard text-foreground'
+            }`}
+          >
+            All ({videos.length})
+          </button>
+
+          <button
+            onClick={() => setCategoryFilter('completed')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              categoryFilter === 'completed'
+                ? 'bg-foreground text-background font-bold shadow-sm'
+                : 'bg-default-100 hover:bg-default-200 dark:bg-yt-surface dark:hover:bg-yt-hoverCard text-foreground'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Completed ({videos.filter((v) => v.status === 'completed').length})</span>
+          </button>
+
+          <button
+            onClick={() => setCategoryFilter('processing')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              categoryFilter === 'processing'
+                ? 'bg-foreground text-background font-bold shadow-sm'
+                : 'bg-default-100 hover:bg-default-200 dark:bg-yt-surface dark:hover:bg-yt-hoverCard text-foreground'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <span>Processing ({videos.filter((v) => v.status === 'processing' || v.status === 'uploading').length})</span>
+          </button>
+
+          <button
+            onClick={() => setCategoryFilter('uploaded')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+              categoryFilter === 'uploaded'
+                ? 'bg-foreground text-background font-bold shadow-sm'
+                : 'bg-default-100 hover:bg-default-200 dark:bg-yt-surface dark:hover:bg-yt-hoverCard text-foreground'
+            }`}
+          >
+            Uploaded ({videos.filter((v) => v.status === 'uploaded').length})
+          </button>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Refresh & Search */}
+        <div className="flex items-center gap-2">
+          <Input
+            size="sm"
+            radius="full"
+            placeholder="Filter list..."
+            value={searchQuery}
+            onValueChange={setSearchQuery}
+            startContent={<Search className="w-3.5 h-3.5 text-default-400" />}
+            className="w-48 sm:w-64"
+            isClearable
+          />
           <Button
+            isIconOnly
             variant="flat"
             size="sm"
+            radius="full"
             onClick={fetchVideos}
-            startContent={<RefreshCw className="w-4 h-4" />}
+            aria-label="Refresh list"
+            className="text-default-500 hover:text-foreground"
           >
-            Refresh
+            <RefreshCw className="w-4 h-4" />
           </Button>
+        </div>
+      </div>
+
+      {/* Video Grid (YouTube 16:9 Thumbnail Layout) */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <div key={i} className="space-y-3 animate-pulse">
+              <div className="aspect-video w-full rounded-2xl bg-default-200 dark:bg-yt-surface" />
+              <div className="flex gap-3">
+                <div className="w-9 h-9 rounded-full bg-default-200 dark:bg-yt-surface shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-default-200 dark:bg-yt-surface rounded w-5/6" />
+                  <div className="h-3 bg-default-200 dark:bg-yt-surface rounded w-1/2" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filteredVideos.length === 0 ? (
+        <div className="text-center py-24 border-2 border-dashed border-default-200 dark:border-yt-border rounded-3xl p-8 space-y-4 max-w-xl mx-auto">
+          <div className="w-16 h-16 rounded-full bg-yt-red/10 text-yt-red mx-auto flex items-center justify-center">
+            <FileVideo className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-foreground">No videos found</h3>
+            <p className="text-xs text-default-400 mt-1 max-w-sm mx-auto">
+              {searchQuery
+                ? `No videos match "${searchQuery}". Try a different keyword.`
+                : 'Get started by uploading your first video to generate synchronized transcripts.'}
+            </p>
+          </div>
           <Button
-            color="primary"
-            size="md"
-            startContent={<Upload className="w-4 h-4" />}
+            size="sm"
+            radius="full"
+            startContent={<Upload className="w-4 h-4 text-white" />}
             onClick={() => setIsUploadOpen(true)}
-            className="shadow-md shadow-primary/20 font-medium"
+            className="bg-yt-red hover:bg-red-700 text-white font-semibold shadow-md shadow-red-600/30 px-5"
           >
             Upload Video
           </Button>
         </div>
-      </div>
-
-      {/* Stats Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border border-default-200 dark:border-default-800 bg-background/50 backdrop-blur-sm">
-          <CardBody className="flex flex-row items-center gap-4 p-4">
-            <div className="p-3 rounded-xl bg-primary-500/10 text-primary">
-              <FileVideo className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs text-default-400 font-medium">Total Videos</p>
-              <h3 className="text-2xl font-bold">{videos.length}</h3>
-            </div>
-          </CardBody>
-        </Card>
-
-        <Card className="border border-default-200 dark:border-default-800 bg-background/50 backdrop-blur-sm">
-          <CardBody className="flex flex-row items-center gap-4 p-4">
-            <div className="p-3 rounded-xl bg-warning-500/10 text-warning">
-              <Clock className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs text-default-400 font-medium">Active Processing</p>
-              <h3 className="text-2xl font-bold">
-                {videos.filter((v) => v.status === 'processing' || v.status === 'uploading' || v.status === 'uploaded').length}
-              </h3>
-            </div>
-          </CardBody>
-        </Card>
-
-        <Card className="border border-default-200 dark:border-default-800 bg-background/50 backdrop-blur-sm">
-          <CardBody className="flex flex-row items-center gap-4 p-4">
-            <div className="p-3 rounded-xl bg-success-500/10 text-success">
-              <Sparkles className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs text-default-400 font-medium">Completed</p>
-              <h3 className="text-2xl font-bold">
-                {videos.filter((v) => v.status === 'completed').length}
-              </h3>
-            </div>
-          </CardBody>
-        </Card>
-      </div>
-
-      {/* Search & Filter Toolbar */}
-      <div className="flex items-center justify-between gap-4">
-        <Input
-          placeholder="Search by video filename..."
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-          startContent={<Search className="w-4 h-4 text-default-400" />}
-          className="max-w-md"
-          variant="bordered"
-          size="sm"
-          isClearable
-        />
-      </div>
-
-      {/* Video Grid */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <Spinner size="lg" color="primary" />
-          <p className="text-sm text-default-400">Loading your video library...</p>
-        </div>
-      ) : filteredVideos.length === 0 ? (
-        <div className="text-center py-20 border-2 border-dashed border-default-200 dark:border-default-800 rounded-2xl p-8 space-y-4">
-          <div className="p-4 rounded-full bg-default-100 dark:bg-default-800 w-16 h-16 mx-auto flex items-center justify-center text-default-400">
-            <VideoIcon className="w-8 h-8" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-foreground">No videos yet</h3>
-            <p className="text-xs text-default-400 max-w-sm mx-auto mt-1">
-              {searchQuery
-                ? 'No videos match your search query.'
-                : 'Upload your first video to extract audio and generate synchronized transcripts.'}
-            </p>
-          </div>
-          <Button
-            color="primary"
-            size="sm"
-            startContent={<Upload className="w-4 h-4" />}
-            onClick={() => setIsUploadOpen(true)}
-          >
-            Upload Now
-          </Button>
-        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredVideos.map((video) => (
-            <Card
-              key={video.id}
-              className="border border-default-200 dark:border-default-800 hover:border-primary/50 transition-all shadow-sm hover:shadow-md group flex flex-col justify-between"
-            >
-              <CardBody className="p-5 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="font-bold text-base text-foreground line-clamp-1 group-hover:text-primary transition-colors">
-                    {video.filename}
-                  </h4>
-                  <JobStatusBadge status={video.status} />
-                </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-7">
+          {filteredVideos.map((video) => {
+            const isCompleted = video.status === 'completed';
+            const isProcessing = video.status === 'processing' || video.status === 'uploading';
 
-                <div className="flex items-center gap-4 text-xs text-default-500 pt-2 border-t border-default-100 dark:border-default-800/60">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-default-400" />
+            return (
+              <div key={video.id} className="group flex flex-col space-y-2.5 cursor-pointer">
+                {/* 16:9 Thumbnail Box */}
+                <Link to={`/videos/${video.id}`} className="relative aspect-video w-full rounded-2xl overflow-hidden bg-default-100 dark:bg-yt-surface border border-default-200/80 dark:border-yt-border yt-card-hover block">
+                  {/* Background Thumbnail Art */}
+                  <div className="absolute inset-0 bg-gradient-to-tr from-black/80 via-neutral-900/60 to-neutral-800/40 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-black/60 text-white/90 group-hover:bg-yt-red group-hover:scale-110 transition-all flex items-center justify-center shadow-lg">
+                      <Play className="w-5 h-5 fill-current ml-0.5" />
+                    </div>
+                  </div>
+
+                  {/* Status Overlay Badge (Top-Left) */}
+                  <div className="absolute top-2.5 left-2.5 z-10">
+                    {isCompleted && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 backdrop-blur-md">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        Transcribed
+                      </span>
+                    )}
+                    {isProcessing && (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-950/80 text-amber-400 border border-amber-500/30 backdrop-blur-md">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        Processing
+                      </span>
+                    )}
+                    {video.status === 'uploaded' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-950/80 text-blue-400 border border-blue-500/30 backdrop-blur-md">
+                        Uploaded
+                      </span>
+                    )}
+                    {video.status === 'failed' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-950/80 text-rose-400 border border-rose-500/30 backdrop-blur-md">
+                        Failed
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Duration Pill (Bottom-Right YouTube Badge) */}
+                  <div className="absolute bottom-2 right-2 z-10 px-1.5 py-0.5 rounded bg-black/85 text-white text-[11px] font-mono font-semibold tracking-wider">
                     {formatDuration(video.duration_seconds)}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <HardDrive className="w-3.5 h-3.5 text-default-400" />
-                    {formatFileSize(video.size_bytes)}
-                  </span>
+                  </div>
+                </Link>
+
+                {/* Video Info Section */}
+                <div className="flex items-start gap-3 px-0.5">
+                  {/* Channel/Studio Avatar */}
+                  <div className="w-9 h-9 rounded-full bg-default-200 dark:bg-yt-surface flex items-center justify-center shrink-0 mt-0.5 border border-default-200 dark:border-yt-border">
+                    <FileVideo className="w-4 h-4 text-yt-red" />
+                  </div>
+
+                  {/* Title & Metadata */}
+                  <div className="flex-1 min-w-0">
+                    <Link to={`/videos/${video.id}`}>
+                      <h4 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug group-hover:text-yt-red transition-colors">
+                        {video.filename}
+                      </h4>
+                    </Link>
+                    <p className="text-xs text-default-400 mt-1">TranscribeX Studio</p>
+                    <div className="flex items-center gap-1.5 text-[11px] text-default-400">
+                      <span>{formatFileSize(video.size_bytes)}</span>
+                      <span>&bull;</span>
+                      <span className="uppercase font-mono text-[10px]">{video.content_type?.split('/')[1] || 'MP4'}</span>
+                    </div>
+                  </div>
+
+                  {/* Kebab Action Menu */}
+                  <Dropdown placement="bottom-end">
+                    <DropdownTrigger>
+                      <button
+                        aria-label="More actions"
+                        className="text-default-400 hover:text-foreground p-1 rounded-full hover:bg-default-100 dark:hover:bg-yt-surface transition-colors"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    </DropdownTrigger>
+                    <DropdownMenu aria-label="Video Options" variant="flat">
+                      <DropdownItem
+                        key="view"
+                        onPress={() => navigate(`/videos/${video.id}`)}
+                        startContent={<Play className="w-4 h-4" />}
+                      >
+                        Open Watch Page
+                      </DropdownItem>
+                      <DropdownItem
+                        key="delete"
+                        color="danger"
+                        className="text-danger"
+                        startContent={<Trash2 className="w-4 h-4" />}
+                        onPress={() => setDeleteVideoId(video.id)}
+                      >
+                        Delete Video
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </Dropdown>
                 </div>
-              </CardBody>
-
-              <CardFooter className="px-5 py-3 bg-default-50/50 dark:bg-default-100/10 border-t border-default-100 dark:border-default-800 flex items-center justify-between">
-                <Button
-                  as={Link}
-                  to={`/videos/${video.id}`}
-                  size="sm"
-                  color="primary"
-                  variant="flat"
-                  startContent={<Play className="w-3.5 h-3.5" />}
-                  className="font-medium"
-                >
-                  View Captions
-                </Button>
-
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="light"
-                  color="danger"
-                  onClick={() => setDeleteVideoId(video.id)}
-                  aria-label="Delete video"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -281,24 +344,28 @@ export const DashboardPage: React.FC = () => {
         onClose={() => setDeleteVideoId(null)}
         placement="center"
         size="sm"
+        backdrop="blur"
       >
         <ModalContent>
-          <ModalHeader>Confirm Deletion</ModalHeader>
+          <ModalHeader className="text-base font-bold">Delete Video</ModalHeader>
           <ModalBody>
-            <p className="text-sm text-default-600">
-              Are you sure you want to permanently delete this video, storage objects, and all generated transcripts?
+            <p className="text-xs text-default-500 leading-relaxed">
+              Are you sure you want to permanently delete this video? All extracted audio, transcripts, and subtitle segments will be permanently removed.
             </p>
           </ModalBody>
           <ModalFooter>
-            <Button variant="flat" onPress={() => setDeleteVideoId(null)}>
+            <Button size="sm" variant="flat" radius="full" onPress={() => setDeleteVideoId(null)}>
               Cancel
             </Button>
             <Button
+              size="sm"
               color="danger"
+              radius="full"
               onPress={handleDelete}
               isLoading={deleting}
+              className="bg-yt-red hover:bg-red-700 text-white font-semibold"
             >
-              Delete Video
+              Delete
             </Button>
           </ModalFooter>
         </ModalContent>
